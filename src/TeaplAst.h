@@ -1,48 +1,48 @@
 #pragma once
 
-typedef struct A_pos_* A_pos; //position information
-typedef struct A_type_* A_type;
-typedef struct A_varDecl_* A_varDecl;
-typedef struct A_varDef_* A_varDef;
-typedef struct A_rightVal_* A_rightVal;
-typedef struct A_arithExpr_* A_arithExpr;
-typedef struct A_boolExpr_* A_boolExpr;
-typedef struct A_arithBiOpExpr_* A_arithBiOpExpr;
-typedef struct A_arithUExpr_* A_arithUExpr;
-typedef struct A_exprUnit_* A_exprUnit;
-typedef struct A_fnCall_* A_fnCall;
-typedef struct A_indexExpr_* A_indexExpr;
-typedef struct A_arrayExpr_* A_arrayExpr;
-typedef struct A_memberExpr_* A_memberExpr;
-typedef struct A_boolUnit_* A_boolUnit;
-typedef struct A_boolBiOpExpr_* A_boolBiOpExpr;
-typedef struct A_boolUOpExpr_* A_boolUOpExpr;
-typedef struct A_comExpr_* A_comExpr;
-typedef struct A_leftVal_* A_leftVal;
-typedef struct A_assignStmt_* A_assignStmt;
-typedef struct A_rightValList_* A_rightValList;
-typedef struct A_varDefScalar_* A_varDefScalar;
-typedef struct A_varDefArray_* A_varDefArray;
-typedef struct A_varDeclScalar_* A_varDeclScalar;
-typedef struct A_varDeclArray_* A_varDeclArray;
-typedef struct A_varDeclStmt_* A_varDeclStmt;
-typedef struct A_varDeclList_* A_varDeclList;
-typedef struct A_structDef_* A_structDef;
-typedef struct A_paramDecl_* A_paramDecl;
-typedef struct A_fnDecl_* A_fnDecl;
-typedef struct A_fnDef_* A_fnDef;
-typedef struct A_codeBlockStmt_* A_codeBlockStmt;
-typedef struct A_ifStmt_* A_ifStmt;
-typedef struct A_whileStmt_* A_whileStmt;
-typedef struct A_fnDeclStmt_* A_fnDeclStmt;
-typedef struct A_callStmt_* A_callStmt;
-typedef struct A_returnStmt_* A_returnStmt;
-typedef struct A_programElement_* A_programElement;
-typedef struct A_codeBlockStmtList_* A_codeBlockStmtList;
-typedef struct A_programElementList_* A_programElementList;
-typedef struct A_program_* A_program;
-typedef struct A_tokenId_* A_tokenId;
-typedef struct A_tokenNum_* A_tokenNum;
+typedef struct A_pos_* A_pos; //1
+typedef struct A_type_* A_type; //2
+typedef struct A_varDecl_* A_varDecl; //3
+typedef struct A_varDef_* A_varDef; //4
+typedef struct A_rightVal_* A_rightVal; //5
+typedef struct A_arithExpr_* A_arithExpr;//6
+typedef struct A_boolExpr_* A_boolExpr;//7
+typedef struct A_arithBiOpExpr_* A_arithBiOpExpr;//8
+typedef struct A_arithUExpr_* A_arithUExpr;//9
+typedef struct A_exprUnit_* A_exprUnit;//10
+typedef struct A_fnCall_* A_fnCall;//11
+typedef struct A_indexExpr_* A_indexExpr;//12
+typedef struct A_arrayExpr_* A_arrayExpr;//13
+typedef struct A_memberExpr_* A_memberExpr;//14
+typedef struct A_boolUnit_* A_boolUnit;//15
+typedef struct A_boolBiOpExpr_* A_boolBiOpExpr;//16
+typedef struct A_boolUOpExpr_* A_boolUOpExpr;//17
+typedef struct A_comExpr_* A_comExpr;//18
+typedef struct A_leftVal_* A_leftVal;//19
+typedef struct A_assignStmt_* A_assignStmt;//20
+typedef struct A_rightValList_* A_rightValList;//21
+typedef struct A_varDefScalar_* A_varDefScalar;//22
+typedef struct A_varDefArray_* A_varDefArray;//23
+typedef struct A_varDeclScalar_* A_varDeclScalar;//24
+typedef struct A_varDeclArray_* A_varDeclArray;//25
+typedef struct A_varDeclStmt_* A_varDeclStmt;//26
+typedef struct A_varDeclList_* A_varDeclList;//27
+typedef struct A_structDef_* A_structDef;//28
+typedef struct A_paramDecl_* A_paramDecl;//29
+typedef struct A_fnDecl_* A_fnDecl;//30
+typedef struct A_fnDef_* A_fnDef;//31
+typedef struct A_codeBlockStmt_* A_codeBlockStmt;//32
+typedef struct A_ifStmt_* A_ifStmt;//33
+typedef struct A_whileStmt_* A_whileStmt;//34
+typedef struct A_fnDeclStmt_* A_fnDeclStmt;//35
+typedef struct A_callStmt_* A_callStmt;//36
+typedef struct A_returnStmt_* A_returnStmt;//37
+typedef struct A_programElement_* A_programElement;//38
+typedef struct A_codeBlockStmtList_* A_codeBlockStmtList;//39
+typedef struct A_programElementList_* A_programElementList;//40
+typedef struct A_program_* A_program;//41
+typedef struct A_tokenId_* A_tokenId;//42
+typedef struct A_tokenNum_* A_tokenNum;//43
 
 struct A_pos_ {
     int line, col;
