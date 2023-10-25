@@ -61,55 +61,22 @@ extern int  yywrap();
   A_tokenId tokenId;//42
   A_tokenNum tokenNum;//43
 }
-//token是词法，就是一些不可拆分的词语
+//token是词法
 %token <pos> ADD //+
 %token <pos> SUB //-
 %token <pos> MUL //*
 %token <pos> DIV ///
 %token <pos> SEMICOLON // ;
-
-
-//type是宏观层面可以分解的 比如pos，tokenId，tokenNum不属于这里,所以一共有43-3 = 40个
-%type <type> Type //2
-%type <varDecl> VarDecl //3
-%type <varDef> VarDef //4
-%type <rightVal> RightVal //5
-%type <arithExpr> ArithExpr //6
-%type <boolExpr> BoolExpr //7
-%type <arithBiOpExpr> ArithBiOpExpr //8
-%type <arithUExpr> ArithUExpr //9
-%type <exprUnit> ExprUnit //10
-%type <fnCall> FnCall //11
-%type <indexExpr> IndexExpr //12
-%type <arrayExpr> ArrayExpr //13
-%type <memberExpr> MemberExpr //14
-%type <boolUnit> BoolUnit //15
-%type <boolBiOpExpr> BoolBiOpExpr //16
-%type <boolUOpExpr> BoolUOpExpr //17
-%type <comExpr> ComExpr //18
-%type <leftVal> LeftVal //19
-%type <assignStmt> AssignStmt //20
-%type <rightValList> RightValList //21
-%type <varDefScalar> VarDefScalar //22
-%type <varDefArray> VarDefArray //23
-%type <varDeclScalar> VarDeclScalar //24
-%type <varDeclArray> VarDeclArray //25
-%type <varDeclStmt> VarDeclStmt //26
-%type <varDeclList> VarDeclList //27
-%type <structDef> StructDef //28
-%type <paramDecl> ParamDecl //29
-%type <fnDecl> FnDecl //30
-%type <fnDef> FnDef //31
-%type <codeBlockStmt> CodeBlockStmt //32
-%type <ifStmt> IfStmt //33
-%type <whileStmt> WhileStmt //34
-%type <fnDeclStmt> FnDeclStmt //35
-%type <callStmt> CallStmt //36
-%type <returnStmt> ReturnStmt //37
-%type <programElement> ProgramElement //38
-%type <codeBlockStmtList> CodeBlockStmtList //39
-%type <programElementList> ProgramElementList //40
-%type <program> Program //41
+//type是宏观层面可以分解的 比如pos，tokenId，tokenNum不属于这里
+%type <program> Program
+%type <arithExpr> ArithExpr
+%type <programElementList> ProgramElementList
+%type <programElement> ProgramElement
+%type <exprUnit> ExprUnit
+%type <structDef> StructDef
+%type <varDeclStmt> VarDeclStmt
+%type <fnDeclStmt> FnDeclStmt
+%type <fnDef> FnDef
 
 %start Program
 
