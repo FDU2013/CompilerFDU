@@ -66,7 +66,23 @@ extern int  yywrap();
 %token <pos> SUB //-
 %token <pos> MUL //*
 %token <pos> DIV ///
-%token <pos> SEMICOLON // ;
+%token <pos> SEMICOLON // 分号
+%token <pos> LEFT_PARENT //（
+%token <pos> RIGHT_PARENT //）
+%token <pos> LEFT_SQUARE_BRACKET //[
+%token <pos> RIGHT_SQUARE_BRACKET //]
+%token <pos> LEFT_BRACE //{
+%token <pos> RIGHT_BRACE //}
+%token <pos> GREATER //大于
+%token <pos> NOT_LESS_THEN //大于等于
+%token <pos> LESS //小于
+%token <pos> NOT_GREATER_THEN //小于等于
+%token <pos> EQUAL //等于
+%token <pos> NOT_EQUAL //不等于
+%token <pos> COMMA //逗号
+%token <pos> COLON //冒号
+%token <pos> LET //let
+%token <pos> POINT //.，比如用在struct上
 
 
 //type是宏观层面可以分解的 比如pos，tokenId，tokenNum不属于这里,所以一共有43-3 = 40个
@@ -173,44 +189,316 @@ ExprUnit{
 //A_boolExpr A_BoolExpr(A_pos pos, A_boolUnit boolUnit);
 BoolExpr:
 BoolBiOpExpr{
-  A_BoolBiOp_Expr($1->pos,$1);
+  $$ = A_BoolBiOp_Expr($1->pos,$1);
 }
 |
 BoolUnit{
-  A_BoolExpr($1->pos,$1)
+  $$ = A_BoolExpr($1->pos,$1);
 };
 
 //8
 //A_arithBiOpExpr A_ArithBiOpExpr(A_pos pos, A_arithBiOp op, A_arithExpr left, A_arithExpr right);
 ArithBiOpExpr:
 ArithExpr ADD ArithExpr{
-  A_ArithBiOpExpr(A_add,$1,$3)
+  $$ = A_ArithBiOpExpr(A_add,$1,$3);
 }
 |
 ArithExpr SUB ArithExpr{
-  A_ArithBiOpExpr(A_sbb,$1,$3)
+  $$ = A_ArithBiOpExpr(A_sbb,$1,$3);
 }
 |
 ArithExpr MUL ArithExpr{
-  A_ArithBiOpExpr(A_mul,$1,$3)
+  $$ = A_ArithBiOpExpr(A_mul,$1,$3);
 }
 |
 ArithExpr DIV ArithExpr{
-  A_ArithBiOpExpr(A_div,$1,$3)
+  $$ = A_ArithBiOpExpr(A_div,$1,$3);
 };
 
 //9
 //A_arithUExpr A_ArithUExpr(A_pos pos, A_arithUOp op, A_exprUnit expr);
 ArithUExpr:
 SUB ArithExpr{
-  A_ArithUExpr($1,A_neg,$2)
+  $$ = A_ArithUExpr($1,A_neg,$2)
 };
 
 //10
-ExprUnit
+//A_exprUnit A_NumExprUnit(A_pos pos, int num);
+//A_exprUnit A_IdExprUnit(A_pos pos, char* id);
+//A_exprUnit A_ArithExprUnit(A_pos pos, A_arithExpr arithExpr);
+//A_exprUnit A_CallExprUnit(A_pos pos, A_fnCall callExpr);
+//A_exprUnit A_ArrayExprUnit(A_pos pos, A_arrayExpr arrayExpr);
+//A_exprUnit A_MemberExprUnit(A_pos pos, A_memberExpr memberExpr);
+//A_exprUnit A_ArithUExprUnit(A_pos pos, A_arithUExpr arithUExpr);
+ExprUnit:
+Num{
+  $$ = A_NumExprUnit($1->pos,$1);
+}
+|
+Id{
+  $$ = A_IdExprUnit($1->pos,$1);
+}
+|
+ArithExpr{
+  $$ = A_ArithExprUnit($1->pos,$1);
+}
+|
+LEFT_PARENT ArithExpr RIGHT_PARENT { 
+  $$ = A_ArithExprUnit($1,$2); //括号是Apos类型
+}
+|
+FnCall{
+  $$ = A_CallExprUnit($1->pos,$1);
+}
+|
+ArrayExpr{
+  $$ = A_ArrayExprUnit($1->pos,$1);
+}
+|
+MemberExpr{
+  $$ = A_MemberExprUnit($1->pos,$1);
+}
+|
+ArithUExpr{
+  $$ = A_ArithUExprUnit($1->pos,$1);
+};
 
 //11
-FnCall
+//A_fnCall A_FnCall(A_pos pos, char* fn, A_rightValList vals);
+FnCall:
+Id LEFT_PARENT RightValList RIGHT_PARENT{
+  $$ = A_FnCall($1->pos,$1->id,$3);
+};
+
+//12
+//A_indexExpr A_NumIndexExpr(A_pos pos, int num);
+//A_indexExpr A_IdIndexExpr(A_pos pos, char* id);
+IndexExpr:
+Num{
+  $$ = A_NumIndexExpr($1->pos,$1->Num);
+}
+|
+Id{
+  $$ = A_IdIndexExpr($1->pos,$1->id);
+};
+
+//13 数组
+//A_arrayExpr A_ArrayExpr(A_pos pos, char* arr, A_indexExpr idx);
+ArrayExpr:
+Id LEFT_SQUARE_BRACKET IndexExpr RIGHT_SQUARE_BRACKET{
+  $$ = A_ArrayExpr($1->pos,$1->id,$3);
+};
+
+//14 member是？
+//A_memberExpr A_MemberExpr(A_pos pos, char* structId, char* memberId);
+MemberExpr:
+Id POINT Id{
+  $$ = A_MemberExpr($1->pos,$1->id,$3->id);
+};
+
+
+//15
+//A_boolUnit A_ComExprUnit(A_pos pos, A_comExpr comExpr);
+//A_boolUnit A_BoolExprUnit(A_pos pos, A_boolExpr boolExpr);
+//A_boolUnit A_BoolUOpExprUnit(A_pos pos, A_boolUOpExpr boolUOpExpr);
+BoolUnit:
+ComExpr{
+  $$ = A_ComExprUnit($1->pos,$1);
+}
+|
+LEFT_PARENT BoolExpr RIGHT_PARENT{
+  $$ = A_BoolExprUnit($1,$2);
+}
+|
+BoolUOpExpr{
+  $$ = A_BoolUOpExprUnit($1->pos,$1);
+};
+
+//16
+//A_boolBiOpExpr A_BoolBiOpExpr(A_pos pos, A_boolBiOp op, A_boolExpr left, A_boolUnit right);
+BoolBiOpExpr:
+BoolExpr OR BoolUnit{
+  $$ = A_BoolBiOpExpr($1->pos,A_or,$1,$3);
+}
+|
+BoolExpr AND BoolUnit{
+  $$ = A_BoolBiOpExpr($1->pos,A_and,$1,$3);
+};
+
+//17
+//A_boolUOpExpr A_BoolUOpExpr(A_pos pos, A_boolUOp op, A_boolUnit cond);
+BoolUOpExpr:
+NOT BoolUnit{
+  $$ = A_boolUOpExpr($1,A_not,$2);
+};
+
+//18 比较 分为 大于，大于等于，小于，小于等于，等于，不等于
+//A_comExpr A_ComExpr(A_pos pos, A_comOp op, A_exprUnit left, A_exprUnit right);
+ComExpr:
+ExprUnit GREATER ExprUnit{
+  $$ = A_ComExpr($1->pos,A_gt,$1,$3);
+}
+|
+ExprUnit NOT_LESS_THEN ExprUnit{
+  $$ = A_ComExpr($1->pos,A_ge,$1,$3);
+}
+|
+ExprUnit LESS ExprUnit{
+  $$ = A_ComExpr($1->pos,A_lt,$1,$3);
+}
+|
+ExprUnit NOT_GREATER_THEN ExprUnit{
+  $$ = A_ComExpr($1->pos,A_le,$1,$3);
+}
+|
+ExprUnit EQUAL ExprUnit{
+  $$ = A_ComExpr($1->pos,A_eq,$1,$3);
+}
+|
+ExprUnit NOT_EQUAL ExprUnit{
+  $$ = A_ComExpr($1->pos,A_ne,$1,$3);
+};
+
+//19
+//A_leftVal A_IdExprLVal(A_pos pos, char* id);
+//A_leftVal A_ArrExprLVal(A_pos pos, A_arrayExpr arrExpr);
+//A_leftVal A_MemberExprLVal(A_pos pos, A_memberExpr memberExpr);
+LeftVal:
+Id{
+  $$ = A_IdExprLVal($1->pos,$1->id);
+}
+|
+ArrayExpr{
+  $$ = A_ArrExprLVal($1->pos,$1);
+}
+|
+MemberExpr{
+  $$ = A_MemberExprVal($1->pos,$1);
+};
+
+
+//20 赋值
+//A_assignStmt A_AssignStmt(A_pos pos, A_leftVal leftVal, A_rightVal rightVal);
+AssignStmt:
+LeftVal ASSIGN RightVal SEMICOLON{
+ $$ = A_AssignStmt($1->pos,$1,$3);
+};
+
+//21 函数传参用到的list
+//A_rightValList A_RightValList(A_rightVal head, A_rightValList tail);
+RightValList:
+RightVal COMMA RightValList{
+  $$ = A_RightValList($1,$3);
+}
+|
+RightVal{
+  $$ = A_RightValList($1,NULL);
+}
+|
+{
+  $$ = NULL;
+};
+
+//22 定义 var:int = 1
+//A_varDefScalar A_VarDefScalar(A_pos pos, char* id, A_type type, A_rightVal val);
+VarDefScalar:
+Id COLON Type ASSIGN RightVal{
+  $$ = A_VarDefScalar($1->pos,$1->id,$3,$5);
+};
+
+//23 带数组的 比如a[1]:int = {1}
+//A_varDefArray A_VarDefArray(A_pos pos, char* id, int len, A_type type, A_rightValList vals);
+VarDefArray:
+Id LEFT_SQUARE_BRACKET Num RIGHT_SQUARE_BRACKET COLON Type ASSIGN LEFT_BRACE RightValList RIGHT_BRACE{
+  $$ = A_VarDefArray($1->pos,$1->id,$3->num,$6,$9);
+};
+
+//24 a:int
+//A_varDeclScalar A_VarDeclScalar(A_pos pos, char* id, A_type type);
+VarDeclScalar:
+Id COLON Type{
+  $$ = A_varDeclScalar($1->pos,$1->id,$3);
+};
+
+//25 a[1]:int
+//A_varDeclArray A_VarDeclArray(A_pos pos, char* id, int len, A_type type);
+VarDeclArray:
+Id LEFT_SQUARE_BRACKET Num RIGHT_SQUARE_BRACKET COLON Type{
+  $$ = A_VarDeclArray($1->pos,$1->id,$3->num,$6);
+}
+
+//26
+//A_varDeclStmt A_VarDeclStmt(A_pos pos, A_varDecl varDecl);
+//A_varDeclStmt A_VarDefStmt(A_pos pos, A_varDef varDef);
+//let a/a[1]:int
+//let a:int = 6
+VarDeclStmt:
+LET VarDecl SEMICOLON{
+  $$ = A_VarDeclStmt($1,$2);
+}
+|
+LET VarDef SEMICOLON{
+  $$ = A_VarDefStmt($1,$2);
+};
+
+//27
+//A_varDeclList A_VarDeclList(A_varDecl head, A_varDeclList tail);
+//a:int,b:int
+VarDeclList:
+VarDecl COMMA VarDeclList{
+  $$ = A_VarDeclList($1,$3)
+}
+|
+VarDecl{
+  $$ = A_VarDeclList($1,NULL);
+}
+|
+{
+  $$ = NULL;
+};
+
+
+//28
+StructDef
+
+//29
+ParamDecl
+
+//30
+FnDecl
+
+//31
+FnDef
+
+//32
+CodeBlockStmt
+
+//33
+IfStmt
+
+//34
+WhileStmt
+
+//35
+FnDeclStmt
+
+//36
+CallStmt
+
+//37
+ReturnStmt
+
+//38
+ProgramElement
+
+//39
+CodeBlockStmtList
+
+//40
+ProgramElementList
+
+//41
+Program
 
 
 
