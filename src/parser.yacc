@@ -115,6 +115,123 @@ extern int  yywrap();
 
 %%                   /* beginning of rules section */
 
+
+//2
+Type:
+
+//3
+//A_varDecl A_VarDecl_Scalar(A_pos pos, A_varDeclScalar declScalar);
+//A_varDecl A_VarDecl_Array(A_pos pos, A_varDeclArray declArray);
+VarDecl:
+VarDeclScalar{
+  $$ = A_VarDecl_Scalar($1->pos,$1);
+}
+|
+VarDeclArray{
+  $$ = A_VarDecl_Array($1->pos,$1);
+};
+
+
+//4
+//A_varDef A_VarDef_Scalar(A_pos pos, A_varDefScalar defScalar);
+//A_varDef A_VarDef_Array(A_pos pos, A_varDefArray defArray);
+VarDef:
+VarDefScalar{
+  $$ = A_VarDef_Scalar($1->pos,$1);
+}
+|
+VarDefArray{
+  $$ = A_VarDef_Array($1->pos,$1);
+};
+
+//5
+//A_rightVal A_ArithExprRVal(A_pos pos, A_arithExpr arithExpr);
+//A_rightVal A_BoolExprRVal(A_pos pos, A_boolExpr boolExpr);
+RightVal:
+ArithExpr{
+  $$ = A_ArithExprRVal($1->pos,$1);
+}
+|
+BoolExpr{
+  $$ = A_BoolExprRVal($1->pos,$1);
+};
+
+//6
+//A_arithExpr A_ArithBiOp_Expr(A_pos pos, A_arithBiOpExpr arithBiOpExpr);
+//A_arithExpr A_ExprUnit(A_pos pos, A_exprUnit exprUnit);
+ArithExpr:
+ArithBiOpExpr{
+  $$ = A_ArithBiOp_Expr($1->pos,$1);
+}
+|
+ExprUnit{
+  $$ = A_ExprUnit($1->pos,$1);
+};
+
+//7
+//A_boolExpr A_BoolBiOp_Expr(A_pos pos, A_boolBiOpExpr boolBiOpExpr);
+//A_boolExpr A_BoolExpr(A_pos pos, A_boolUnit boolUnit);
+BoolExpr:
+BoolBiOpExpr{
+  A_BoolBiOp_Expr($1->pos,$1);
+}
+|
+BoolUnit{
+  A_BoolExpr($1->pos,$1)
+};
+
+//8
+//A_arithBiOpExpr A_ArithBiOpExpr(A_pos pos, A_arithBiOp op, A_arithExpr left, A_arithExpr right);
+ArithBiOpExpr:
+ArithExpr ADD ArithExpr{
+  A_ArithBiOpExpr(A_add,$1,$3)
+}
+|
+ArithExpr SUB ArithExpr{
+  A_ArithBiOpExpr(A_sbb,$1,$3)
+}
+|
+ArithExpr MUL ArithExpr{
+  A_ArithBiOpExpr(A_mul,$1,$3)
+}
+|
+ArithExpr DIV ArithExpr{
+  A_ArithBiOpExpr(A_div,$1,$3)
+};
+
+//9
+//A_arithUExpr A_ArithUExpr(A_pos pos, A_arithUOp op, A_exprUnit expr);
+ArithUExpr:
+SUB ArithExpr{
+  A_ArithUExpr($1,A_neg,$2)
+};
+
+//10
+ExprUnit
+
+//11
+FnCall
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Program: ProgramElementList 
 {  
   root = A_Program($1);
