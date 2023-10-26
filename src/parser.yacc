@@ -152,7 +152,7 @@ extern int  yywrap();
 //A_type A_NativeType(A_pos pos, A_nativeType ntype);
 //A_type A_StructType(A_pos pos, char* stype);
 Type:
-Int{
+INT{
   $$ = A_NativeType($1,A_intTypeKind);
 }
 |
@@ -225,26 +225,26 @@ BoolUnit{
 //A_arithBiOpExpr A_ArithBiOpExpr(A_pos pos, A_arithBiOp op, A_arithExpr left, A_arithExpr right);
 ArithBiOpExpr:
 ArithExpr ADD ArithExpr{
-  $$ = A_ArithBiOpExpr(A_add,$1,$3);
+  $$ = A_ArithBiOpExpr($1->pos,A_add,$1,$3);
 }
 |
 ArithExpr SUB ArithExpr{
-  $$ = A_ArithBiOpExpr(A_sbb,$1,$3);
+  $$ = A_ArithBiOpExpr($1->pos,A_sub,$1,$3);
 }
 |
 ArithExpr MUL ArithExpr{
-  $$ = A_ArithBiOpExpr(A_mul,$1,$3);
+  $$ = A_ArithBiOpExpr($1->pos,A_mul,$1,$3);
 }
 |
 ArithExpr DIV ArithExpr{
-  $$ = A_ArithBiOpExpr(A_div,$1,$3);
+  $$ = A_ArithBiOpExpr($1->pos,A_div,$1,$3);
 };
 
 //9
 //A_arithUExpr A_ArithUExpr(A_pos pos, A_arithUOp op, A_exprUnit expr);
 ArithUExpr:
-SUB ArithExpr{
-  $$ = A_ArithUExpr($1,A_neg,$2)
+SUB ExprUnit{
+  $$ = A_ArithUExpr($1,A_neg,$2);
 };
 
 //10
@@ -257,15 +257,11 @@ SUB ArithExpr{
 //A_exprUnit A_ArithUExprUnit(A_pos pos, A_arithUExpr arithUExpr);
 ExprUnit:
 Num{
-  $$ = A_NumExprUnit($1->pos,$1);
+  $$ = A_NumExprUnit($1->pos,$1->num);
 }
 |
 Id{
-  $$ = A_IdExprUnit($1->pos,$1);
-}
-|
-ArithExpr{
-  $$ = A_ArithExprUnit($1->pos,$1);
+  $$ = A_IdExprUnit($1->pos,$1->id);
 }
 |
 LEFT_PARENT ArithExpr RIGHT_PARENT { 
@@ -300,7 +296,7 @@ Id LEFT_PARENT RightValList RIGHT_PARENT{
 //A_indexExpr A_IdIndexExpr(A_pos pos, char* id);
 IndexExpr:
 Num{
-  $$ = A_NumIndexExpr($1->pos,$1->Num);
+  $$ = A_NumIndexExpr($1->pos,$1->num);
 }
 |
 Id{
@@ -354,7 +350,7 @@ BoolExpr AND BoolUnit{
 //A_boolUOpExpr A_BoolUOpExpr(A_pos pos, A_boolUOp op, A_boolUnit cond);
 BoolUOpExpr:
 NOT BoolUnit{
-  $$ = A_boolUOpExpr($1,A_not,$2);
+  $$ = A_BoolUOpExpr($1,A_not,$2);
 };
 
 //18 比较 分为 大于，大于等于，小于，小于等于，等于，不等于
@@ -364,24 +360,24 @@ ExprUnit GREATER ExprUnit{
   $$ = A_ComExpr($1->pos,A_gt,$1,$3);
 }
 |
-ExprUnit NOT_LESS_THEN ExprUnit{
-  $$ = A_ComExpr($1->pos,A_ge,$1,$3);
+ExprUnit NOT_GREATER_THEN ExprUnit{
+  $$ = A_ComExpr($1->pos,A_le,$1,$3);
 }
 |
 ExprUnit LESS ExprUnit{
   $$ = A_ComExpr($1->pos,A_lt,$1,$3);
 }
 |
-ExprUnit NOT_GREATER_THEN ExprUnit{
-  $$ = A_ComExpr($1->pos,A_le,$1,$3);
-}
-|
-ExprUnit EQUAL ExprUnit{
-  $$ = A_ComExpr($1->pos,A_eq,$1,$3);
+ExprUnit NOT_LESS_THEN ExprUnit{
+  $$ = A_ComExpr($1->pos,A_ge,$1,$3);
 }
 |
 ExprUnit NOT_EQUAL ExprUnit{
   $$ = A_ComExpr($1->pos,A_ne,$1,$3);
+}
+|
+ExprUnit EQUAL ExprUnit{
+  $$ = A_ComExpr($1->pos,A_eq,$1,$3);
 };
 
 //19
@@ -398,7 +394,7 @@ ArrayExpr{
 }
 |
 MemberExpr{
-  $$ = A_MemberExprVal($1->pos,$1);
+  $$ = A_MemberExprLVal($1->pos,$1);
 };
 
 
@@ -442,7 +438,7 @@ Id LEFT_SQUARE_BRACKET Num RIGHT_SQUARE_BRACKET COLON Type ASSIGN LEFT_BRACE Rig
 //A_varDeclScalar A_VarDeclScalar(A_pos pos, char* id, A_type type);
 VarDeclScalar:
 Id COLON Type{
-  $$ = A_varDeclScalar($1->pos,$1->id,$3);
+  $$ = A_VarDeclScalar($1->pos,$1->id,$3);
 };
 
 //25 a[1]:int
@@ -471,7 +467,7 @@ LET VarDef SEMICOLON{
 //a:int,b:int
 VarDeclList:
 VarDecl COMMA VarDeclList{
-  $$ = A_VarDeclList($1,$3)
+  $$ = A_VarDeclList($1,$3);
 }
 |
 VarDecl{
@@ -493,7 +489,7 @@ STRUCT Id LEFT_BRACE VarDeclList RIGHT_BRACE{
 //29
 //A_paramDecl A_ParamDecl(A_varDeclList varDecls)
 ParamDecl:
-VarDecls{
+VarDeclList{
   $$ = A_ParamDecl($1);
 };
 
@@ -569,6 +565,7 @@ IfStmt:
 IF LEFT_PARENT BoolExpr RIGHT_PARENT LEFT_BRACE CodeBlockStmtList RIGHT_BRACE{
   $$ = A_IfStmt($1,$3,$6,NULL);
 }
+|
 IF LEFT_PARENT BoolExpr RIGHT_PARENT LEFT_BRACE CodeBlockStmtList RIGHT_BRACE ELSE LEFT_BRACE CodeBlockStmtList RIGHT_BRACE{
   $$ = A_IfStmt($1,$3,$6,$10);
 };
@@ -609,13 +606,27 @@ RET RightVal SEMICOLON{
 //A_programElement A_ProgramFnDeclStmt(A_pos pos, A_fnDeclStmt fnDecl);
 //A_programElement A_ProgramFnDef(A_pos pos, A_fnDef fnDef);
 ProgramElement:
-VarDeclStmt{
-  $$ = A_ProgramVarDeclStmt($1->pos,$1);
+VarDeclStmt
+{
+  $$ = A_ProgramVarDeclStmt($1->pos, $1);
 }
-|
-StructDef{
-  $$ = A_ProgramStructDef($1->pos,$1);
+| StructDef
+{
+  $$ = A_ProgramStructDef($1->pos, $1);
 }
+| FnDeclStmt
+{
+  $$ = A_ProgramFnDeclStmt($1->pos, $1);
+}
+| FnDef
+{
+  $$ = A_ProgramFnDef($1->pos, $1);
+}
+| SEMICOLON
+{
+  $$ = A_ProgramNullStmt($1);
+}
+;
 
 //39
 //A_codeBlockStmtList A_CodeBlockStmtList(A_codeBlockStmt head, A_codeBlockStmtList tail);

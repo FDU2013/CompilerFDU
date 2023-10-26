@@ -6,10 +6,9 @@
 extern int line, col;
 %}
 
-// TODO:
-// your lexer
+/*TODO:*/
+/*your lexer*/
 
-//
 %start COMMENT_1 COMMENT_2
 %%
 
@@ -22,7 +21,7 @@ extern int line, col;
 "*" {yylval.pos=A_Pos(line,col);col+=strlen(yytext);return MUL;}
 "/" {yylval.pos=A_Pos(line,col);col+=strlen(yytext);return DIV;}
 ";" {yylval.pos=A_Pos(line,col);col+=strlen(yytext);return SEMICOLON;}
-"(" {yylval.pos=A_Pos(line,col);col+=strlen(yytext);return LEFT_PARENT};
+"(" {yylval.pos=A_Pos(line,col);col+=strlen(yytext);return LEFT_PARENT;}
 ")" {yylval.pos=A_Pos(line,col);col+=strlen(yytext);return RIGHT_PARENT;} 
 "[" {yylval.pos=A_Pos(line,col);col+=strlen(yytext);return LEFT_SQUARE_BRACKET;}
 "]" {yylval.pos=A_Pos(line,col);col+=strlen(yytext);return RIGHT_SQUARE_BRACKET;}
