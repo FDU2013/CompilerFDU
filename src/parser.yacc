@@ -62,27 +62,43 @@ extern int  yywrap();
   A_tokenNum tokenNum;//43
 }
 //token是词法，就是一些不可拆分的词语
-%token <pos> ADD //+
-%token <pos> SUB //-
-%token <pos> MUL //*
-%token <pos> DIV ///
+%token <pos> ADD //加法
+%token <pos> SUB //减法
+%token <pos> MUL //乘法
+%token <pos> DIV //除法
 %token <pos> SEMICOLON // 分号
-%token <pos> LEFT_PARENT //（
-%token <pos> RIGHT_PARENT //）
-%token <pos> LEFT_SQUARE_BRACKET //[
-%token <pos> RIGHT_SQUARE_BRACKET //]
-%token <pos> LEFT_BRACE //{
-%token <pos> RIGHT_BRACE //}
+%token <pos> LEFT_PARENT //左小括号
+%token <pos> RIGHT_PARENT //右小括号
+%token <pos> LEFT_SQUARE_BRACKET //左中括号
+%token <pos> RIGHT_SQUARE_BRACKET //右中括号
+%token <pos> LEFT_BRACE //左大括号
+%token <pos> RIGHT_BRACE //右大括号
 %token <pos> GREATER //大于
 %token <pos> NOT_LESS_THEN //大于等于
 %token <pos> LESS //小于
 %token <pos> NOT_GREATER_THEN //小于等于
 %token <pos> EQUAL //等于
 %token <pos> NOT_EQUAL //不等于
+%token <pos> ASSIGN // 赋值
 %token <pos> COMMA //逗号
 %token <pos> COLON //冒号
 %token <pos> LET //let
-%token <pos> POINT //.，比如用在struct上
+%token <pos> POINT //点，比如用在struct上
+%token <pos> RET //ret
+%token <pos> AND //与
+%token <pos> OR //或
+%token <pos> NOT //非
+%token <pos> FN //fn
+%token <pos> IF //if
+%token <pos> ELSE //else
+%token <pos> WHILE //while
+%token <pos> BREAK //break
+%token <pos> CONTINUE //continue
+%token <pos> RIGHT_ARROW //->
+%token <pos> INT //int
+%token <pos> STRUCT //struct
+%token <tokenId> Id 
+%token <tokenNum> Num
 
 
 //type是宏观层面可以分解的 比如pos，tokenId，tokenNum不属于这里,所以一共有43-3 = 40个
@@ -133,7 +149,16 @@ extern int  yywrap();
 
 
 //2
+//A_type A_NativeType(A_pos pos, A_nativeType ntype);
+//A_type A_StructType(A_pos pos, char* stype);
 Type:
+Int{
+  $$ = A_NativeType($1,A_intTypeKind);
+}
+|
+Id{
+  $$ = A_StructType($1->pos,$1->id);
+}
 
 //3
 //A_varDecl A_VarDecl_Scalar(A_pos pos, A_varDeclScalar declScalar);
@@ -459,128 +484,170 @@ VarDecl{
 
 
 //28
-StructDef
+//A_structDef A_StructDef(A_pos pos, char* id, A_varDeclList varDecls);
+StructDef:
+STRUCT Id LEFT_BRACE VarDeclList RIGHT_BRACE{
+  $$ = A_StructDef($1,$2->id,$4);
+};
 
 //29
-ParamDecl
+//A_paramDecl A_ParamDecl(A_varDeclList varDecls)
+ParamDecl:
+VarDecls{
+  $$ = A_ParamDecl($1);
+};
 
 //30
-FnDecl
+//A_fnDecl A_FnDecl(A_pos pos, char* id, A_paramDecl paramDecl, A_type type);
+//声明函数 fn f(a:int)->int
+FnDecl:
+FN Id LEFT_PARENT ParamDecl RIGHT_PARENT{
+  $$ = A_FnDecl($1,$2->id,$4,NULL);
+}
+|
+FN Id LEFT_PARENT ParamDecl RIGHT_PARENT RIGHT_ARROW Type{
+  $$ = A_FnDecl($1,$2->id,$4,$7);
+};
 
 //31
-FnDef
+//A_fnDef A_FnDef(A_pos pos, A_fnDecl fnDecl, A_codeBlockStmtList stmts);
+FnDef:
+FnDecl LEFT_BRACE CodeBlockStmtList RIGHT_BRACE{
+  $$ = A_FnDef($1->pos,$1,$3);
+};
 
 //32
-CodeBlockStmt
+//A_codeBlockStmt A_BlockNullStmt(A_pos pos);
+//A_codeBlockStmt A_BlockVarDeclStmt(A_pos pos, A_varDeclStmt varDeclStmt);
+//A_codeBlockStmt A_BlockAssignStmt(A_pos pos, A_assignStmt assignStmt);
+//A_codeBlockStmt A_BlockCallStmt(A_pos pos, A_callStmt callStmt);
+//A_codeBlockStmt A_BlockIfStmt(A_pos pos, A_ifStmt ifStmt);
+//A_codeBlockStmt A_BlockWhileStmt(A_pos pos, A_whileStmt whileStmt);
+//A_codeBlockStmt A_BlockReturnStmt(A_pos pos, A_returnStmt returnStmt);
+//A_codeBlockStmt A_BlockContinueStmt(A_pos pos);
+//A_codeBlockStmt A_BlockBreakStmt(A_pos pos);
+CodeBlockStmt:
+VarDeclStmt{
+  $$ = A_BlockVarDeclStmt($1->pos,$1);
+}
+|
+AssignStmt{
+  $$ = A_BlockAssignStmt($1->pos,$1);
+}
+|
+CallStmt{
+  $$ = A_BlockCallStmt($1->pos,$1);
+}
+|
+IfStmt{
+  $$ = A_BlockIfStmt($1->pos,$1);
+}
+|
+WhileStmt{
+  $$ = A_BlockWhileStmt($1->pos,$1);
+}
+|
+ReturnStmt{
+  $$ = A_BlockReturnStmt($1->pos,$1);
+}
+|
+CONTINUE SEMICOLON{
+  $$ = A_BlockContinueStmt($1);
+}
+|
+BREAK SEMICOLON{
+  $$ = A_BlockBreakStmt($1);
+}
+|
+SEMICOLON{
+  $$ = A_BlockNullStmt($1);
+};
 
 //33
-IfStmt
+//A_ifStmt A_IfStmt(A_pos pos, A_boolExpr boolExpr, A_codeBlockStmtList ifStmts, A_codeBlockStmtList elseStmts);
+IfStmt:
+IF LEFT_PARENT BoolExpr RIGHT_PARENT LEFT_BRACE CodeBlockStmtList RIGHT_BRACE{
+  $$ = A_IfStmt($1,$3,$6,NULL);
+}
+IF LEFT_PARENT BoolExpr RIGHT_PARENT LEFT_BRACE CodeBlockStmtList RIGHT_BRACE ELSE LEFT_BRACE CodeBlockStmtList RIGHT_BRACE{
+  $$ = A_IfStmt($1,$3,$6,$10);
+};
+
 
 //34
-WhileStmt
+//A_whileStmt A_WhileStmt(A_pos pos, A_boolExpr boolExpr, A_codeBlockStmtList whileStmts);
+WhileStmt:
+WHILE LEFT_PARENT BoolExpr RIGHT_PARENT LEFT_BRACE CodeBlockStmtList RIGHT_BRACE{
+  $$ = A_WhileStmt($1,$3,$6);
+};
 
 //35
-FnDeclStmt
+//A_fnDeclStmt A_FnDeclStmt(A_pos pos, A_fnDecl fnDecl);
+FnDeclStmt:
+FnDecl SEMICOLON{
+  $$ = A_FnDeclStmt($1->pos,$1);
+};
 
 //36
-CallStmt
+//A_callStmt A_CallStmt(A_pos pos, A_fnCall fnCall);
+CallStmt:
+FnCall SEMICOLON{
+  $$ = A_CallStmt($1->pos,$1);
+};
 
 //37
-ReturnStmt
+//A_returnStmt A_ReturnStmt(A_pos pos, A_rightVal retVal);
+ReturnStmt:
+RET RightVal SEMICOLON{
+  $$ = A_ReturnStmt($1,$2);
+};
 
 //38
-ProgramElement
+//A_programElement A_ProgramNullStmt(A_pos pos);
+//A_programElement A_ProgramVarDeclStmt(A_pos pos, A_varDeclStmt varDeclStmt);
+//A_programElement A_ProgramStructDef(A_pos pos, A_structDef structDef);
+//A_programElement A_ProgramFnDeclStmt(A_pos pos, A_fnDeclStmt fnDecl);
+//A_programElement A_ProgramFnDef(A_pos pos, A_fnDef fnDef);
+ProgramElement:
+VarDeclStmt{
+  $$ = A_ProgramVarDeclStmt($1->pos,$1);
+}
+|
+StructDef{
+  $$ = A_ProgramStructDef($1->pos,$1);
+}
 
 //39
-CodeBlockStmtList
+//A_codeBlockStmtList A_CodeBlockStmtList(A_codeBlockStmt head, A_codeBlockStmtList tail);
+CodeBlockStmtList:
+CodeBlockStmt CodeBlockStmtList{
+  $$ = A_CodeBlockStmtList($1,$2);
+}
+|
+CodeBlockStmt{
+  $$ = A_CodeBlockStmtList($1,NULL);
+}
 
 //40
-ProgramElementList
-
-//41
-Program
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Program: ProgramElementList 
-{  
-  root = A_Program($1);
-  $$ = A_Program($1);
-}
-;
-
-ProgramElementList: ProgramElement ProgramElementList
-{
-  $$ = A_ProgramElementList($1, $2);
+//A_programElementList A_ProgramElementList(A_programElement head, A_programElementList tail);
+ProgramElementList:
+ProgramElement ProgramElementList{
+  $$ = A_ProgramElementList($1,$2);
 }
 |
 {
   $$ = NULL;
-}
-;
+};
 
-ProgramElement: VarDeclStmt
-{
-  $$ = A_ProgramVarDeclStmt($1->pos, $1);
-}
-| StructDef
-{
-  $$ = A_ProgramStructDef($1->pos, $1);
-}
-| FnDeclStmt
-{
-  $$ = A_ProgramFnDeclStmt($1->pos, $1);
-}
-| FnDef
-{
-  $$ = A_ProgramFnDef($1->pos, $1);
-}
-| SEMICOLON
-{
-  $$ = A_ProgramNullStmt($1);
-}
-;
+//41
+//A_program A_Program(A_programElementList programElements);
+Program: 
+ProgramElementList 
+{  
+  root = A_Program($1);
+  $$ = A_Program($1);
+};
 
-
-ArithExpr: ArithExpr ADD ArithExpr
-{
-  $$ = A_ArithBiOp_Expr($1->pos, A_ArithBiOpExpr($1->pos, A_add, $1, $3));
-}
-| ArithExpr SUB ArithExpr
-{
-  $$ = A_ArithBiOp_Expr($1->pos, A_ArithBiOpExpr($1->pos, A_sub, $1, $3));
-}
-| ArithExpr MUL ArithExpr
-{
-  $$ = A_ArithBiOp_Expr($1->pos, A_ArithBiOpExpr($1->pos, A_mul, $1, $3));
-}
-| ArithExpr DIV ArithExpr
-{
-  $$ = A_ArithBiOp_Expr($1->pos, A_ArithBiOpExpr($1->pos, A_div, $1, $3));
-}
-| ExprUnit
-{
-  $$ = A_ExprUnit($1->pos, $1);
-}
-;
 
 %%
 
