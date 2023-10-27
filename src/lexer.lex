@@ -61,16 +61,16 @@ extern int line, col;
     yylval.tokenId = A_TokenId(A_Pos(line, col), new_text); col+=strlen(yytext); return Id; 
 }
 ([1-9]+[0-9]*)|[0]	{ yylval.tokenNum = A_TokenNum(A_Pos(line, col),atoi(yytext)); col+=strlen(yytext); return Num; }
-
+.	{ printf("Illegal Character:%s\n",yytext); }
 }
 <COMMENT_1>{
 [\n\r] {  BEGIN INITIAL; line=line+1; col=0; }
-. {  /* ignore comment */ }
+. {/*comment*/}
 }
 
 <COMMENT_2>{
 "*/" {  BEGIN INITIAL;  }
 [\n\r] { line=line+1; col=0;  }
-. { /* ignore comment */ }
+. {/*comment*/}
 }
 %%
