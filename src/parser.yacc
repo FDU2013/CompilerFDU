@@ -61,7 +61,7 @@ extern int  yywrap();
   A_tokenId tokenId;//42
   A_tokenNum tokenNum;//43
 }
-//token是词法，就是一些不可拆分的词语
+//token
 %token <pos> ADD //加法
 %token <pos> SUB //减法
 %token <pos> MUL //乘法
@@ -101,7 +101,7 @@ extern int  yywrap();
 %token <tokenNum> Num
 
 
-//type是宏观层面可以分解的 比如pos，tokenId，tokenNum不属于这里,所以一共有43-3 = 40个
+//type,在union中的pos，tokenId，tokenNum不属于这里,所以一共有43-3 = 40个
 %type <type> Type //2
 %type <varDecl> VarDecl //3
 %type <varDef> VarDef //4
@@ -158,7 +158,7 @@ INT{
 |
 Id{
   $$ = A_StructType($1->pos,$1->id);
-}
+};
 
 //3
 //A_varDecl A_VarDecl_Scalar(A_pos pos, A_varDeclScalar declScalar);
