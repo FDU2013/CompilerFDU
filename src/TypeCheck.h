@@ -34,3 +34,5 @@ void check_WhileStmt(std::ostream* out, aA_whileStmt ws);
 void check_CallStmt(std::ostream* out, aA_callStmt cs);
 void check_ReturnStmt(std::ostream* out, aA_returnStmt rs);
 
+//对于局部变量的取消注册
+void cancelStmtRegis(std::ostream* out,aA_varDeclStmt vd);

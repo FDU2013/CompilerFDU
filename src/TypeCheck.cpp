@@ -239,20 +239,35 @@ aA_type check_MemberExpr(std::ostream* out, aA_memberExpr me){
     return nullptr;
 }
 
-
+//检查if语句
 void check_IfStmt(std::ostream* out, aA_ifStmt is){
     if(!is)
         return;
     check_BoolExpr(out, is->boolExpr);
+    //对每个if语句进行判断
     for(aA_codeBlockStmt s : is->ifStmts){
         check_CodeblockStmt(out, s);
+    }
+    //TODO：对于局部变量的注册取消掉
+    //只有对于变量声明的语句要取消掉
+    for(aA_codeBlockStmt s : is->ifStmts){
+        if(s->kind==A_codeBlockStmtType::A_varDeclStmtKind){
+            cancelStmtRegis(out,s->u.varDeclStmt);
+        }
     }
     for(aA_codeBlockStmt s : is->elseStmts){
         check_CodeblockStmt(out, s);
     }
+    for(aA_codeBlockStmt s : is->elseStmts){
+        if(s->kind==A_codeBlockStmtType::A_varDeclStmtKind){
+            cancelStmtRegis(out,s->u.varDeclStmt);
+        }
+    }
     return;
 }
+void cancelStmtRegis(std::ostream* out,aA_varDeclStmt){
 
+}
 
 void check_BoolExpr(std::ostream* out, aA_boolExpr be){
     if(!be)
