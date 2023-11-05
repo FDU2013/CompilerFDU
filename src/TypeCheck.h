@@ -1,19 +1,29 @@
 #pragma once
-#include <stdlib.h>
-#include <stdio.h>
-#include <iostream>
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
+
+#include <iostream>
+#include <map>
+#include <unordered_map>
+#include <unordered_set>
+
 #include "TeaplAst.h"
 #include "TeaplaAst.h"
-#include <unordered_map>
-
 
 // you can use this type to store the type a token.
-typedef std::unordered_map<string, aA_type> typeMap; 
+typedef std::unordered_map<string, aA_type> typeMap;
 
-// you can use this map to store the members of a struct or params of a function.
+// you can use this map to store the members of a struct or params of a
+// function.
 typedef std::unordered_map<string, vector<aA_varDecl>*> paramMemberMap;
+
+typedef std::map<string, A_pos> posMap;
+
+typedef std::map<string, int> arraySizeMap;
+
+typedef std::unordered_set<string> funcSet;
 
 void check_Prog(std::ostream* out, aA_program p);
 void check_VarDecl(std::ostream* out, aA_varDeclStmt vd);
@@ -33,4 +43,3 @@ void check_FuncCall(std::ostream* out, aA_fnCall fc);
 void check_WhileStmt(std::ostream* out, aA_whileStmt ws);
 void check_CallStmt(std::ostream* out, aA_callStmt cs);
 void check_ReturnStmt(std::ostream* out, aA_returnStmt rs);
-
