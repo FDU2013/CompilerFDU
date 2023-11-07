@@ -5,23 +5,26 @@
 #include "TeaplaAst.h"
 #include "TypeCheck.h"
 
-extern typeMap g_token2Type;
-extern typeMap l_token2Type;
+class VarDeclCheckProxy;
+class FnProxy;
+class StructProxy;
 
-extern typeMap funcparam_token2Type;
+// typedef std::shared_ptr<VarDeclCheckProxy> my_Var;
 
-extern paramMemberMap func2Param;
-extern paramMemberMap struct2Members;
+using my_Var = std::shared_ptr<VarDeclCheckProxy>;
+using my_Func = std::shared_ptr<FnProxy>;
+using my_Struct = std::shared_ptr<StructProxy>;
 
-extern funcSet funcDefs;
-extern funcSet funcDelcs;
+using varMap = std::unordered_map<string, my_Var>;
+using funcMap = std::unordered_map<string, my_Func>;
+using structMap = std::unordered_map<string, my_Struct>;
 
-extern posMap func2Pos;
-extern posMap g_token2Pos;
-extern posMap l_token2Pos;
+varMap g_token2Var;
+varMap l_token2Var;
 
-extern arraySizeMap g_token2Size;
-extern arraySizeMap l_token2Size;
+structMap token2Struct;
+
+funcMap token2Func;
 
 void error_print(std::ostream* out, A_pos p, string info);
 void check_g_varName(std::ostream* out, A_pos pos, string name);
@@ -39,19 +42,15 @@ class VarDeclCheckProxyFactory {
       bool isParam = false) {
     if (vd->kind == A_varDeclStmtType::A_varDeclKind) {
       if (vd->u.varDecl->kind == A_varDeclType::A_varDeclScalarKind) {
-        return std::make_shared<VarDeclCheckProxy>(
-            ScalarDeclProxy(out, vd, isGlobal, isParam));
+        return std::make_shared<ScalarDeclProxy>(out, vd, isGlobal, isParam);
       } else {
-        return std::make_shared<VarDeclCheckProxy>(
-            ArrayDeclProxy(out, vd, isGlobal, isParam));
+        return std::make_shared<ArrayDeclProxy>(out, vd, isGlobal, isParam);
       }
     } else if (vd->kind == A_varDeclStmtType::A_varDefKind) {
       if (vd->u.varDef->kind == A_varDefType::A_varDefScalarKind) {
-        return std::make_shared<VarDeclCheckProxy>(
-            ScalarDefProxy(out, vd, isGlobal, isParam));
+        return std::make_shared<ScalarDefProxy>(out, vd, isGlobal, isParam);
       } else {
-        return std::make_shared<VarDeclCheckProxy>(
-            ArrayDefProxy(out, vd, isGlobal, isParam));
+        return std::make_shared<ArrayDefProxy>(out, vd, isGlobal, isParam);
       }
     }
     return nullptr;
@@ -74,13 +73,13 @@ class VarDeclCheckProxy {
     global_ = isGlobal;
     param_ = isParam;
     out_ = out;
-    if (global_) {
-      token2type_ = &g_token2Type;
-      token2pos_ = &g_token2Pos;
-    } else {
-      token2type_ = &l_token2Type;
-      token2pos_ = &l_token2Pos;
-    }
+    // if (global_) {
+    //   token2type_ = &g_token2Type;
+    //   token2pos_ = &g_token2Pos;
+    // } else {
+    //   token2type_ = &l_token2Type;
+    //   token2pos_ = &l_token2Pos;
+    // }
   }
   void CheckStmt() {
     CheckLegality();
@@ -93,6 +92,8 @@ class VarDeclCheckProxy {
     }
     EraseTable();
   }
+
+  string getName() { return name_; }
 
  protected:
   bool global_;
@@ -112,12 +113,12 @@ class VarDeclCheckProxy {
     }
   }
   virtual void ConfigTable() {
-    token2type_->emplace(name_, type_);
-    token2pos_->emplace(name_, pos_);
+    // token2type_->emplace(name_, type_);
+    // token2pos_->emplace(name_, pos_);
   }
   virtual void EraseTable() {
-    token2type_->erase(name_);
-    token2pos_->erase(name_);
+    // token2type_->erase(name_);
+    // token2pos_->erase(name_);
   }
 };
 
@@ -150,26 +151,26 @@ class ArrayDeclProxy : public VarDeclCheckProxy {
   ArrayDeclProxy(std::ostream* out, aA_varDeclStmt vd, bool isGlobal,
                  bool isParam)
       : VarDeclCheckProxy(out, vd, isGlobal, isParam) {
-    if (global_) {
-      token2Szie_ = &g_token2Size;
-    } else {
-      token2Szie_ = &l_token2Size;
-    }
+    // if (global_) {
+    //   token2Szie_ = &g_token2Size;
+    // } else {
+    //   token2Szie_ = &l_token2Size;
+    // }
     size_ = vd->u.varDef->u.defArray->len;
   }
 
  protected:
   int size_;
-  arraySizeMap* token2Szie_;
+  // arraySizeMap* token2Szie_;
 
   virtual void ConfigTable() override {
     VarDeclCheckProxy::ConfigTable();
-    token2Szie_->emplace(name_, size_);
+    // token2Szie_->emplace(name_, size_);
   }
 
   virtual void EraseTable() override {
     VarDeclCheckProxy::EraseTable();
-    token2Szie_->erase(name_);
+    // token2Szie_->erase(name_);
   }
 };
 
@@ -195,4 +196,112 @@ class ArrayDefProxy : public ArrayDeclProxy {
 
  protected:
   vector<aA_rightVal>* vals_;
+};
+
+class FnProxy {
+ public:
+  FnProxy(std::ostream* out, aA_fnDecl fd) {
+    defined_ = false;
+    check_g_varName(out, fd->pos, *fd->id);
+    // vector<aA_varDecl>* params =
+    //     new vector<aA_varDecl>(fd->paramDecl->varDecls);
+    // funcDelcs.emplace(*(fd->id));
+    // func2Param.emplace(*(fd->id), params);
+    // func2Pos.emplace(*(fd->id), fd->pos);
+    // funcparam_token2Type.emplace(*(fd->id), fd->type);
+    Init(fd);
+  }
+
+  FnProxy(std::ostream* out, aA_fnDef fd) {
+    check_g_varName(out, fd->pos, *fd->fnDecl->id);
+    Init(fd->fnDecl);
+  }
+
+  string getName() { return name_; }
+
+  bool isDefined() { return defined_; }
+
+  void CheckDecl(std::ostream* out, aA_fnDecl fd) {
+    check_g_varName(out, fd->pos, *fd->id);
+    CheckParams(out, fd);
+    if (!Equal(fd->type, ret_type_)) {
+      error_print(out, fd->pos, "return type conflicts.");
+    }
+  }
+
+  void Define(std::ostream* out, aA_fnDef fd) {
+    vector<string> params;
+    for (aA_varDecl vd : fd->fnDecl->paramDecl->varDecls) {
+      aA_varDeclStmt vdStmt = new aA_varDeclStmt_;
+      vdStmt->pos = vd->pos;
+      vdStmt->kind = A_varDeclStmtType::A_varDeclKind;
+      vdStmt->u.varDecl = vd;
+      my_Var decl = VarDeclCheckProxyFactory::CreateVarDeclProxy(out, vdStmt,
+                                                                 false, true);
+
+      decl->CheckStmt();
+      params.push_back(decl->getName());
+      l_token2Var.emplace(decl->getName(), decl);
+    }
+
+    for (auto cs : fd->stmts) {
+      check_CodeblockStmt(out, cs);
+    }
+
+    for (auto param : params) {
+      l_token2Var[param]->Unregister();
+      l_token2Var.erase(param);
+    }
+  }
+
+ protected:
+  bool defined_;
+  string name_;
+  A_pos defPos_;
+  aA_type ret_type_;
+  vector<aA_varDecl> params_;
+
+  void Init(aA_fnDecl fd) {
+    name_ = *(fd->id);
+    ret_type_ = fd->type;
+    params_ = fd->paramDecl->varDecls;
+  }
+
+  void CheckParams(std::ostream* out, aA_fnDecl fd) {
+    auto& target = fd->paramDecl->varDecls;
+
+    if (target.size() != params_.size()) goto error;
+    for (int i = 0; i < params_.size(); i++) {
+      aA_varDecl a = params_[i];
+      aA_varDecl b = target[i];
+      if (a->kind == A_varDeclScalarKind && b->kind == A_varDeclScalarKind) {
+        aA_varDeclScalar aScalar = a->u.declScalar;
+        aA_varDeclScalar bScalar = b->u.declScalar;
+        if (!Equal(aScalar->type, bScalar->type)) {
+          goto error;
+        }
+      } else if (a->kind == A_varDeclArrayKind &&
+                 b->kind == A_varDeclArrayKind) {
+        aA_varDeclArray aArray = a->u.declArray;
+        aA_varDeclArray bArray = b->u.declArray;
+        if (aArray->len != bArray->len) goto error;
+        if (!Equal(aArray->type, bArray->type)) goto error;
+      } else {
+        goto error;
+      }
+    }
+  error:
+    error_print(out, fd->pos,
+                "Function overloading is not currently supported.");
+  }
+};
+
+class StructProxy {
+ protected:
+  bool defined_;
+  string name_;
+  A_pos pos_;
+  aA_type ret_type_;
+  vector<aA_varDecl> params_;
+  std::ostream* out_;
 };

@@ -88,6 +88,7 @@ void check_Prog(std::ostream* out, aA_program p) {
       check_FnDeclStmt(out, ele->u.fnDeclStmt);
     }
     if (ele->kind == A_programFnDefKind) {
+      check_FnPreDef(out, ele->u.fnDef);
     }
   }
 
@@ -106,17 +107,17 @@ void check_GlobalVarDecl(std::ostream* out, aA_varDeclStmt vd) {
   if (!vd) return;
   auto decl = VarDeclCheckProxyFactory::CreateVarDeclProxy(out, vd);
   decl->CheckStmt();
+  g_token2Var.emplace(decl->getName(), decl);
 }
 
-std::shared_ptr<VarDeclCheckProxy> check_LocalVarDecl(std::ostream* out,
-                                                      aA_varDeclStmt vd,
-                                                      bool isParam = false) {
+void check_LocalVarDecl(std::ostream* out, aA_varDeclStmt vd,
+                        bool isParam = false) {
   // TODO：不允许调用函数对全局变量进行初始化
   if (!vd) return;
   auto decl =
       VarDeclCheckProxyFactory::CreateVarDeclProxy(out, vd, false, isParam);
   decl->CheckStmt();
-  return decl;
+  l_token2Var.emplace(decl->getName(), decl);
 }
 
 void check_VarDecl(std::ostream* out, aA_varDeclStmt vd) {
@@ -159,11 +160,6 @@ void check_StructDef(std::ostream* out, aA_structDef sd) {
   struct2Members.emplace(*(sd->id), paramMap);
   return;
 }
-// TODO:
-void check_overLoad(std::ostream* out, aA_fnDecl fd,
-                    vector<aA_varDecl>* origin) {
-  error_print(out, fd->pos, "");
-}
 
 void check_FnDecl(std::ostream* out, aA_fnDecl fd) {
   // Example:
@@ -173,18 +169,13 @@ void check_FnDecl(std::ostream* out, aA_fnDecl fd) {
       write your code here
       Hint: you may need to check if the function is already declared
   */
-
-  check_g_varName(out, fd->pos, *fd->id);
-  if (funcDelcs.find(*(fd->id)) != funcDelcs.end()) {
-    error_print(out, fd->pos,
-                string("Funcition ") + *(fd->id) + string(" has defined."));
+  auto it = token2Func.find(*fd->id);
+  if (it != token2Func.end()) {
+    my_Func func = it->second;
+    func->CheckDecl(out, fd);
   } else {
-    vector<aA_varDecl>* params =
-        new vector<aA_varDecl>(fd->paramDecl->varDecls);
-    funcDelcs.emplace(*(fd->id));
-    func2Param.emplace(*(fd->id), params);
-    func2Pos.emplace(*(fd->id), fd->pos);
-    funcparam_token2Type.emplace(*(fd->id), fd->type);
+    my_Func func = std::make_shared<FnProxy>(out, fd);
+    token2Func.emplace(func->getName(), func);
   }
 }
 
@@ -196,6 +187,22 @@ void check_FnDeclStmt(std::ostream* out, aA_fnDeclStmt fd) {
   return;
 }
 
+void check_FnPreDef(std::ostream* out, aA_fnDef fd) {
+  auto it = token2Func.find(*fd->fnDecl->id);
+  if (it != token2Func.end()) {
+    error_print(out, fd->pos,
+                string("function has defined on position: ") +
+                    std::to_string(fd->pos->line));
+  }
+  if (!it->second->isDefined()) {
+    my_Func func = it->second;
+    func->CheckDecl(out, fd->fnDecl);
+  } else {
+    my_Func func = std::make_shared<FnProxy>(out, fd);
+    token2Func.emplace(func->getName(), func);
+  }
+}
+
 void check_FnDef(std::ostream* out, aA_fnDef fd) {
   // Example:
   //      fn main(a:int, b:int)->int{
@@ -204,29 +211,21 @@ void check_FnDef(std::ostream* out, aA_fnDef fd) {
   //          return c;
   //      }
   if (!fd) return;
-  check_FnDecl(out, fd->fnDecl);
-  /*
-      write your code here
-      Hint: you may pay attention to the function parameters, local variables
-     and global variables.
-  */
-  vector<std::shared_ptr<VarDeclCheckProxy>> decls;
-  for (aA_varDecl vd : fd->fnDecl->paramDecl->varDecls) {
-    aA_varDeclStmt vdStmt = new aA_varDeclStmt_;
-    vdStmt->pos = vd->pos;
-    vdStmt->kind = A_varDeclStmtType::A_varDeclKind;
-    vdStmt->u.varDecl = vd;
-    decls.push_back(check_LocalVarDecl(out, vdStmt, true));
-  }
+  // check_FnDecl(out, fd->fnDecl);
+  // /*
+  //     write your code here
+  //     Hint: you may pay attention to the function parameters, local variables
+  //    and global variables.
+  // */
 
-  for (auto cs : fd->stmts) {
-    check_CodeblockStmt(out, cs);
+  my_Func func;
+  auto it = token2Func.find(*fd->fnDecl->id);
+  if (it != token2Func.end()) {
+    func = it->second;
+    func->Define(out, fd);
+  } else {
+    error_print(out, fd->pos, "Function not exists.");
   }
-
-  for (auto decl : decls) {
-    decl->Unregister();
-  }
-  return;
 }
 
 void check_CodeblockStmt(std::ostream* out, aA_codeBlockStmt cs) {
@@ -321,224 +320,225 @@ void check_IfStmt(std::ostream* out, aA_ifStmt is) {
   }
   return;
 }
-void cancelStmtRegis(std::ostream* out, aA_varDeclStmt) {
-  void check_BoolExpr(std::ostream * out, aA_boolExpr be) {
-    if (!be) return;
-    switch (be->kind) {
-      case A_boolExprType::A_boolBiOpExprKind:
-        /* write your code here */
-        check_BoolExpr(out, be->u.boolBiOpExpr->left);
-        check_BoolExpr(out, be->u.boolBiOpExpr->right);
-        break;
-      case A_boolExprType::A_boolUnitKind:
-        check_BoolUnit(out, be->u.boolUnit);
-        break;
-      default:
-        break;
-    }
-    return;
+
+void cancelStmtRegis(std::ostream* out, aA_varDeclStmt);
+
+void check_BoolExpr(std::ostream* out, aA_boolExpr be) {
+  if (!be) return;
+  switch (be->kind) {
+    case A_boolExprType::A_boolBiOpExprKind:
+      /* write your code here */
+      check_BoolExpr(out, be->u.boolBiOpExpr->left);
+      check_BoolExpr(out, be->u.boolBiOpExpr->right);
+      break;
+    case A_boolExprType::A_boolUnitKind:
+      check_BoolUnit(out, be->u.boolUnit);
+      break;
+    default:
+      break;
   }
+  return;
+}
 
-  void check_BoolUnit(std::ostream * out, aA_boolUnit bu) {
-    if (!bu) return;
-    switch (bu->kind) {
-      case A_boolUnitType::A_comOpExprKind: {
-        /* write your code here */
-        check_Compare(out, bu->u.comExpr->pos,
-                      check_ExprUnit(out, bu->u.comExpr->left),
-                      check_ExprUnit(out, bu->u.comExpr->right));
-      } break;
-      case A_boolUnitType::A_boolExprKind:
-        /* write your code here */
-        check_BoolExpr(out, bu->u.boolExpr);
-        break;
-      case A_boolUnitType::A_boolUOpExprKind:
-        /* write your code here */
-        check_BoolUnit(out, bu->u.boolUOpExpr->cond);
-        break;
-      default:
-        break;
-    }
-    return;
+void check_BoolUnit(std::ostream* out, aA_boolUnit bu) {
+  if (!bu) return;
+  switch (bu->kind) {
+    case A_boolUnitType::A_comOpExprKind: {
+      /* write your code here */
+      check_Compare(out, bu->u.comExpr->pos,
+                    check_ExprUnit(out, bu->u.comExpr->left),
+                    check_ExprUnit(out, bu->u.comExpr->right));
+    } break;
+    case A_boolUnitType::A_boolExprKind:
+      /* write your code here */
+      check_BoolExpr(out, bu->u.boolExpr);
+      break;
+    case A_boolUnitType::A_boolUOpExprKind:
+      /* write your code here */
+      check_BoolUnit(out, bu->u.boolUOpExpr->cond);
+      break;
+    default:
+      break;
   }
+  return;
+}
 
-  aA_type check_ExprUnit(std::ostream * out, aA_exprUnit eu) {
-    // validate the expression unit and return the aA_type of it
-    // you may need to check if the type of this expression matches with its
-    // leftvalue or rightvalue, so return its aA_type would be a good way.
-    // Feel free to change the design pattern if you need.
-    if (!eu) return nullptr;
-    aA_type ret;
-    switch (eu->kind) {
-      case A_exprUnitType::A_idExprKind: {
-        /* write your code here */
-        check_scalarExists(out, eu->pos, *eu->u.id);
+aA_type check_ExprUnit(std::ostream* out, aA_exprUnit eu) {
+  // validate the expression unit and return the aA_type of it
+  // you may need to check if the type of this expression matches with its
+  // leftvalue or rightvalue, so return its aA_type would be a good way.
+  // Feel free to change the design pattern if you need.
+  if (!eu) return nullptr;
+  aA_type ret;
+  switch (eu->kind) {
+    case A_exprUnitType::A_idExprKind: {
+      /* write your code here */
+      check_scalarExists(out, eu->pos, *eu->u.id);
 
-      } break;
-      case A_exprUnitType::A_numExprKind: {
-        /* write your code here */
-      } break;
-      case A_exprUnitType::A_fnCallKind: {
-        /* write your code here */
-      } break;
-      case A_exprUnitType::A_arrayExprKind: {
-        /* write your code here */
-      } break;
-      case A_exprUnitType::A_memberExprKind: {
-        /* write your code here */
-      } break;
-      case A_exprUnitType::A_arithExprKind: {
-        /* write your code here */
-      } break;
-      case A_exprUnitType::A_arithUExprKind: {
-        /* write your code here */
-      } break;
-    }
-    return ret;
+    } break;
+    case A_exprUnitType::A_numExprKind: {
+      /* write your code here */
+    } break;
+    case A_exprUnitType::A_fnCallKind: {
+      /* write your code here */
+    } break;
+    case A_exprUnitType::A_arrayExprKind: {
+      /* write your code here */
+    } break;
+    case A_exprUnitType::A_memberExprKind: {
+      /* write your code here */
+    } break;
+    case A_exprUnitType::A_arithExprKind: {
+      /* write your code here */
+    } break;
+    case A_exprUnitType::A_arithUExprKind: {
+      /* write your code here */
+    } break;
   }
+  return ret;
+}
 
-  void check_FuncCall(std::ostream * out, aA_fnCall fc) {
-    if (!fc) return;
-    // Example:
-    //      foo(1, 2);
+void check_FuncCall(std::ostream* out, aA_fnCall fc) {
+  if (!fc) return;
+  // Example:
+  //      foo(1, 2);
 
-    /* write your code here */
-    return;
+  /* write your code here */
+  return;
+}
+
+void check_WhileStmt(std::ostream* out, aA_whileStmt ws) {
+  if (!ws) return;
+  check_BoolExpr(out, ws->boolExpr);
+  for (aA_codeBlockStmt s : ws->whileStmts) {
+    check_CodeblockStmt(out, s);
   }
+  return;
+}
 
-  void check_WhileStmt(std::ostream * out, aA_whileStmt ws) {
-    if (!ws) return;
-    check_BoolExpr(out, ws->boolExpr);
-    for (aA_codeBlockStmt s : ws->whileStmts) {
-      check_CodeblockStmt(out, s);
-    }
-    return;
+void check_CallStmt(std::ostream* out, aA_callStmt cs) {
+  if (!cs) return;
+  check_FuncCall(out, cs->fnCall);
+  return;
+}
+
+void check_ReturnStmt(std::ostream* out, aA_returnStmt rs) {
+  if (!rs) return;
+  return;
+}
+
+void check_g_varName(std::ostream* out, A_pos pos, string name) {
+  if (token2Func.find(name) != token2Func.end()) {
+    error_print(out, pos,
+                string("function: ") + (name) + string(" have existed."));
   }
-
-  void check_CallStmt(std::ostream * out, aA_callStmt cs) {
-    if (!cs) return;
-    check_FuncCall(out, cs->fnCall);
-    return;
+  if (g_token2Var.find(name) != g_token2Var.end()) {
+    error_print(out, pos,
+                string("global var: ") + (name) + string(" have existed."));
   }
+}
 
-  void check_ReturnStmt(std::ostream * out, aA_returnStmt rs) {
-    if (!rs) return;
-    return;
+void check_l_varName(std::ostream* out, A_pos pos, string name) {
+  check_g_varName(out, pos, name);
+  if (l_token2Var.find(name) != l_token2Var.end()) {
+    error_print(out, pos,
+                string("local var: ") + (name) + string(" have existed."));
   }
+}
 
-  void check_g_varName(std::ostream * out, A_pos pos, string name) {
-    if (funcDelcs.find(name) != funcDelcs.end()) {
-      error_print(
-          out, pos,
-          string("global function: ") + (name) + string(" have existed."));
-    }
-    if (g_token2Type.find(name) != g_token2Type.end()) {
-      error_print(out, pos,
-                  string("global var: ") + (name) + string(" have existed."));
-    }
+void check_fnDecled() {}
+
+void check_fnDefed() {}
+
+aA_type get_RightValType(std::ostream* out, aA_rightVal rl) {
+  if (rl->kind == A_rightValType::A_arithExprValKind) {
   }
-
-  void check_l_varName(std::ostream * out, A_pos pos, string name) {
-    check_g_varName(out, pos, name);
-    if (l_token2Type.find(name) != l_token2Type.end()) {
-      error_print(out, pos,
-                  string("local var: ") + (name) + string(" have existed."));
-    }
+  if (rl->kind == A_rightValType::A_boolExprValKind) {
   }
+  error_print(out, rl->pos, "some thing wrong.");
+  return nullptr;
+}
 
-  aA_type get_RightValType(std::ostream * out, aA_rightVal rl) {
-    if (rl->kind == A_rightValType::A_arithExprValKind) {
-    }
-    if (rl->kind == A_rightValType::A_boolExprValKind) {
-    }
-    error_print(out, rl->pos, "some thing wrong.");
-    return nullptr;
+bool Equal(aA_type type1, aA_type type2) {
+  if (type1 == nullptr && type2 == nullptr) return true;
+
+  if (type1 == nullptr || type2 == nullptr) return false;
+  if (type1->type != type2->type) return false;
+
+  if (type1->type == A_nativeTypeKind) {
+    if (type1->u.nativeType != type2->u.nativeType) return false;
   }
-
-  bool Equal(aA_type type1, aA_type type2) {
-    if (type1 == nullptr && type2 == nullptr) return true;
-
-    if (type1 == nullptr || type2 == nullptr) return false;
-    if (type1->type != type2->type) return false;
-
-    if (type1->type == A_nativeTypeKind) {
-      if (type1->u.nativeType != type2->u.nativeType) return false;
-    }
-    if (type1->type == A_structTypeKind) {
-      if (type1->u.structType->compare(*(type2->u.structType)) != 0)
-        return false;
-    }
-    return true;
+  if (type1->type == A_structTypeKind) {
+    if (type1->u.structType->compare(*(type2->u.structType)) != 0) return false;
   }
+  return true;
+}
 
-  string get_TypeName(aA_type type) {
-    if (type == nullptr) return "nullptr";
-    switch (type->type) {
-      case A_nativeTypeKind: {
-        switch (type->u.nativeType) {
-          case A_intTypeKind: {
-            return "int";
-            break;
-          }
-          default:
-            break;
+string get_TypeName(aA_type type) {
+  if (type == nullptr) return "nullptr";
+  switch (type->type) {
+    case A_nativeTypeKind: {
+      switch (type->u.nativeType) {
+        case A_intTypeKind: {
+          return "int";
+          break;
         }
-        break;
+        default:
+          break;
       }
-      case A_structTypeKind: {
-        return *type->u.structType;
-        break;
-      }
-      default:
-        break;
+      break;
     }
-  }
-
-  void check_Convert(std::ostream * out, A_pos pos, aA_type left,
-                     aA_type right) {
-    if (!Equal(left, right)) {
-      error_print(out, pos,
-                  string("cannot convert ") + get_TypeName(left) +
-                      string(" to ") + get_TypeName(right) + string(" ."));
+    case A_structTypeKind: {
+      return *type->u.structType;
+      break;
     }
+    default:
+      break;
+  }
+}
+
+void check_Convert(std::ostream* out, A_pos pos, aA_type left, aA_type right) {
+  if (!Equal(left, right)) {
+    error_print(out, pos,
+                string("cannot convert ") + get_TypeName(left) +
+                    string(" to ") + get_TypeName(right) + string(" ."));
+  }
+}
+
+void check_scalarExists(std::ostream* out, A_pos pos, string name) {
+  if (l_token2Type.find(name) == l_token2Type.end() &&
+      g_token2Type.find(name) == g_token2Type.end()) {
+    error_print(out, pos, name + string(" is not defined."));
   }
 
-  void check_scalarExists(std::ostream * out, A_pos pos, string name) {
-    if (l_token2Type.find(name) == l_token2Type.end() &&
-        g_token2Type.find(name) == g_token2Type.end()) {
-      error_print(out, pos, name + string(" is not defined."));
-    }
-
-    if (l_token2Size.find(name) == l_token2Size.end() ||
-        g_token2Size.find(name) == g_token2Size.end()) {
-      error_print(out, pos, name + string(" is array."));
-    }
+  if (l_token2Size.find(name) == l_token2Size.end() ||
+      g_token2Size.find(name) == g_token2Size.end()) {
+    error_print(out, pos, name + string(" is array."));
   }
+}
 
-  void check_Compare(std::ostream * out, A_pos pos, aA_type left,
-                     aA_type right) {
-    if (left == nullptr || right == nullptr) goto error;
-    if (left->type == A_dataType::A_structTypeKind ||
-        right->type == A_dataType::A_structTypeKind)
-      goto error;
-    if (left->u.nativeType != A_nativeType::A_intTypeKind ||
-        right->u.nativeType != A_nativeType::A_intTypeKind)
-      goto error;
+void check_Compare(std::ostream* out, A_pos pos, aA_type left, aA_type right) {
+  if (left == nullptr || right == nullptr) goto error;
+  if (left->type == A_dataType::A_structTypeKind ||
+      right->type == A_dataType::A_structTypeKind)
+    goto error;
+  if (left->u.nativeType != A_nativeType::A_intTypeKind ||
+      right->u.nativeType != A_nativeType::A_intTypeKind)
+    goto error;
 
-  error:
-    error_print(
-        out, pos,
-        get_TypeName(left) + " can't compare to " + get_TypeName(right));
-  }
+error:
+  error_print(out, pos,
+              get_TypeName(left) + " can't compare to " + get_TypeName(right));
+}
 
-  bool check_NativeType(aA_type target, A_nativeType type) {
-    if (target == nullptr) return false;
-    if (target->type == A_dataType::A_structTypeKind) return false;
-    return target->u.nativeType == type;
-  }
+bool check_NativeType(aA_type target, A_nativeType type) {
+  if (target == nullptr) return false;
+  if (target->type == A_dataType::A_structTypeKind) return false;
+  return target->u.nativeType == type;
+}
 
-  bool check_StructType(aA_type target, string type) {
-    if (target == nullptr) return false;
-    if (target->type == A_dataType::A_nativeTypeKind) return false;
-    return target->u.structType->compare(type) == 0;
-  }
+bool check_StructType(aA_type target, string type) {
+  if (target == nullptr) return false;
+  if (target->type == A_dataType::A_nativeTypeKind) return false;
+  return target->u.structType->compare(type) == 0;
+}
