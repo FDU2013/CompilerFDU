@@ -4,6 +4,7 @@
 
 #include "TeaplAst.h"
 #include "TeaplaAst.h"
+#include "TypeCheckClass.h"
 
 // maps to store the type information. Feel free to design new data structures
 // if you need.
@@ -103,35 +104,19 @@ void check_Prog(std::ostream* out, aA_program p) {
 void check_GlobalVarDecl(std::ostream* out, aA_varDeclStmt vd) {
   // TODO：不允许调用函数对全局变量进行初始化
   if (!vd) return;
-  string name;
-  A_pos pos;
-  aA_type type;
-  if (vd->u.varDecl->kind == A_varDeclType::A_varDeclScalarKind) {
-    if (vd->u.varDecl->kind == A_varDeclType::A_varDeclScalarKind) {
-      name = *vd->u.varDecl->u.declScalar->id;
-      pos = vd->u.varDecl->u.declScalar->pos;
-      type = vd->u.varDecl->u.declScalar->type;
-      register_GlobalScalar(name, type, pos);
-    } else {
-      name = *vd->u.varDecl->u.declArray->id;
-      pos = vd->u.varDecl->u.declArray->pos;
-      type = vd->u.varDecl->u.declArray->type;
-      int size = vd->u.varDecl->u.declArray->len;
-    }
-  } else if (vd->kind == A_varDeclStmtType::A_varDefKind) {
-    if (vd->u.varDef->kind == A_varDefType::A_varDefScalarKind) {
-      name = *vd->u.varDef->u.defScalar->id;
-      pos = vd->u.varDef->u.defScalar->pos;
-      type = vd->u.varDef->u.defScalar->type;
-      aA_rightVal val = vd->u.varDef->u.defScalar->val;
-    } else {
-      name = *vd->u.varDef->u.defArray->id;
-      pos = vd->u.varDef->u.defArray->pos;
-      type = vd->u.varDef->u.defArray->type;
-      int size = vd->u.varDef->u.defArray->len;
-      vector<aA_rightVal>& vals = vd->u.varDef->u.defArray->vals;
-    }
-  }
+  auto decl = VarDeclCheckProxyFactory::CreateVarDeclProxy(out, vd);
+  decl->CheckStmt();
+}
+
+std::shared_ptr<VarDeclCheckProxy> check_LocalVarDecl(std::ostream* out,
+                                                      aA_varDeclStmt vd,
+                                                      bool isParam = false) {
+  // TODO：不允许调用函数对全局变量进行初始化
+  if (!vd) return;
+  auto decl =
+      VarDeclCheckProxyFactory::CreateVarDeclProxy(out, vd, false, isParam);
+  decl->CheckStmt();
+  return decl;
 }
 
 void check_VarDecl(std::ostream* out, aA_varDeclStmt vd) {
@@ -165,19 +150,42 @@ void check_StructDef(std::ostream* out, aA_structDef sd) {
   //      }
 
   /* write your code here */
+  // 目前没有检查结构名不与关键字冲突
+  if (struct2Members.find(*(sd->id)) == struct2Members.end()) {
+    error_print(out, sd->pos, " struct redefine: " + *sd->id);
+    return;
+  }
+  vector<aA_varDecl>* paramMap = new vector<aA_varDecl>(sd->varDecls);
+  struct2Members.emplace(*(sd->id), paramMap);
   return;
+}
+// TODO:
+void check_overLoad(std::ostream* out, aA_fnDecl fd,
+                    vector<aA_varDecl>* origin) {
+  error_print(out, fd->pos, "");
 }
 
 void check_FnDecl(std::ostream* out, aA_fnDecl fd) {
   // Example:
   //      fn main(a:int, b:int)->int
   if (!fd) return;
-
   /*
       write your code here
       Hint: you may need to check if the function is already declared
   */
-  return;
+
+  check_g_varName(out, fd->pos, *fd->id);
+  if (funcDelcs.find(*(fd->id)) != funcDelcs.end()) {
+    error_print(out, fd->pos,
+                string("Funcition ") + *(fd->id) + string(" has defined."));
+  } else {
+    vector<aA_varDecl>* params =
+        new vector<aA_varDecl>(fd->paramDecl->varDecls);
+    funcDelcs.emplace(*(fd->id));
+    func2Param.emplace(*(fd->id), params);
+    func2Pos.emplace(*(fd->id), fd->pos);
+    funcparam_token2Type.emplace(*(fd->id), fd->type);
+  }
 }
 
 void check_FnDeclStmt(std::ostream* out, aA_fnDeclStmt fd) {
@@ -202,6 +210,22 @@ void check_FnDef(std::ostream* out, aA_fnDef fd) {
       Hint: you may pay attention to the function parameters, local variables
      and global variables.
   */
+  vector<std::shared_ptr<VarDeclCheckProxy>> decls;
+  for (aA_varDecl vd : fd->fnDecl->paramDecl->varDecls) {
+    aA_varDeclStmt vdStmt = new aA_varDeclStmt_;
+    vdStmt->pos = vd->pos;
+    vdStmt->kind = A_varDeclStmtType::A_varDeclKind;
+    vdStmt->u.varDecl = vd;
+    decls.push_back(check_LocalVarDecl(out, vdStmt, true));
+  }
+
+  for (auto cs : fd->stmts) {
+    check_CodeblockStmt(out, cs);
+  }
+
+  for (auto decl : decls) {
+    decl->Unregister();
+  }
   return;
 }
 
@@ -289,6 +313,8 @@ void check_BoolExpr(std::ostream* out, aA_boolExpr be) {
   switch (be->kind) {
     case A_boolExprType::A_boolBiOpExprKind:
       /* write your code here */
+      check_BoolExpr(out, be->u.boolBiOpExpr->left);
+      check_BoolExpr(out, be->u.boolBiOpExpr->right);
       break;
     case A_boolExprType::A_boolUnitKind:
       check_BoolUnit(out, be->u.boolUnit);
@@ -304,12 +330,17 @@ void check_BoolUnit(std::ostream* out, aA_boolUnit bu) {
   switch (bu->kind) {
     case A_boolUnitType::A_comOpExprKind: {
       /* write your code here */
+      check_Compare(out, bu->u.comExpr->pos,
+                    check_ExprUnit(out, bu->u.comExpr->left),
+                    check_ExprUnit(out, bu->u.comExpr->right));
     } break;
     case A_boolUnitType::A_boolExprKind:
       /* write your code here */
+      check_BoolExpr(out, bu->u.boolExpr);
       break;
     case A_boolUnitType::A_boolUOpExprKind:
       /* write your code here */
+      check_BoolUnit(out, bu->u.boolUOpExpr->cond);
       break;
     default:
       break;
@@ -327,6 +358,8 @@ aA_type check_ExprUnit(std::ostream* out, aA_exprUnit eu) {
   switch (eu->kind) {
     case A_exprUnitType::A_idExprKind: {
       /* write your code here */
+      check_scalarExists(out, eu->pos, *eu->u.id);
+
     } break;
     case A_exprUnitType::A_numExprKind: {
       /* write your code here */
@@ -379,35 +412,23 @@ void check_ReturnStmt(std::ostream* out, aA_returnStmt rs) {
   return;
 }
 
-void register_GlobalScalar(string name, aA_type type, A_pos pos) {
-  // g_scalarToken2Type.emplace(name, type);
-  g_token2Pos.emplace(name, pos);
-}
-
-void register_GlobalArray(string name, aA_type type, A_pos pos) {
-  // g_arrayToken2Type.emplace(name, type);
-  g_token2Pos.emplace(name, pos);
-}
-
 void check_g_varName(std::ostream* out, A_pos pos, string name) {
-  if (funcDelcs.count(name) > 0) {
-    error_print(out, pos,
-                string("variables name: ") + (name) +
-                    string(" dplicates with function."));
+  if (funcDelcs.find(name) != funcDelcs.end()) {
+    error_print(
+        out, pos,
+        string("global function: ") + (name) + string(" have existed."));
   }
-  if (g_token2Type.count(name) > 0) {
+  if (g_token2Type.find(name) != g_token2Type.end()) {
     error_print(out, pos,
-                string("local variables ") + (name) +
-                    string(" dplicates with global variables."));
+                string("global var: ") + (name) + string(" have existed."));
   }
 }
 
 void check_l_varName(std::ostream* out, A_pos pos, string name) {
   check_g_varName(out, pos, name);
-  if (l_token2Type.count(name) > 0) {
+  if (l_token2Type.find(name) != l_token2Type.end()) {
     error_print(out, pos,
-                string("local variables ") + (name) +
-                    string(" dplicates with local variables."));
+                string("local var: ") + (name) + string(" have existed."));
   }
 }
 
@@ -422,13 +443,16 @@ aA_type get_RightValType(std::ostream* out, aA_rightVal rl) {
 
 bool Equal(aA_type type1, aA_type type2) {
   if (type1 == nullptr && type2 == nullptr) return true;
+
   if (type1 == nullptr || type2 == nullptr) return false;
   if (type1->type != type2->type) return false;
+
   if (type1->type == A_nativeTypeKind) {
     if (type1->u.nativeType != type2->u.nativeType) return false;
   }
-  if (type1->type == A_structTypeKind)
+  if (type1->type == A_structTypeKind) {
     if (type1->u.structType->compare(*(type2->u.structType)) != 0) return false;
+  }
   return true;
 }
 
@@ -447,7 +471,7 @@ string get_TypeName(aA_type type) {
       break;
     }
     case A_structTypeKind: {
-      return *(type->u.structType);
+      return *type->u.structType;
       break;
     }
     default:
@@ -461,4 +485,42 @@ void check_Convert(std::ostream* out, A_pos pos, aA_type left, aA_type right) {
                 string("cannot convert ") + get_TypeName(left) +
                     string(" to ") + get_TypeName(right) + string(" ."));
   }
+}
+
+void check_scalarExists(std::ostream* out, A_pos pos, string name) {
+  if (l_token2Type.find(name) == l_token2Type.end() &&
+      g_token2Type.find(name) == g_token2Type.end()) {
+    error_print(out, pos, name + string(" is not defined."));
+  }
+
+  if (l_token2Size.find(name) == l_token2Size.end() ||
+      g_token2Size.find(name) == g_token2Size.end()) {
+    error_print(out, pos, name + string(" is array."));
+  }
+}
+
+void check_Compare(std::ostream* out, A_pos pos, aA_type left, aA_type right) {
+  if (left == nullptr || right == nullptr) goto error;
+  if (left->type == A_dataType::A_structTypeKind ||
+      right->type == A_dataType::A_structTypeKind)
+    goto error;
+  if (left->u.nativeType != A_nativeType::A_intTypeKind ||
+      right->u.nativeType != A_nativeType::A_intTypeKind)
+    goto error;
+
+error:
+  error_print(out, pos,
+              get_TypeName(left) + " can't compare to " + get_TypeName(right));
+}
+
+bool check_NativeType(aA_type target, A_nativeType type) {
+  if (target == nullptr) return false;
+  if (target->type == A_dataType::A_structTypeKind) return false;
+  return target->u.nativeType == type;
+}
+
+bool check_StructType(aA_type target, string type) {
+  if (target == nullptr) return false;
+  if (target->type == A_dataType::A_nativeTypeKind) return false;
+  return target->u.structType->compare(type) == 0;
 }

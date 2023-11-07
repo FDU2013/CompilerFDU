@@ -43,3 +43,7 @@ void check_FuncCall(std::ostream* out, aA_fnCall fc);
 void check_WhileStmt(std::ostream* out, aA_whileStmt ws);
 void check_CallStmt(std::ostream* out, aA_callStmt cs);
 void check_ReturnStmt(std::ostream* out, aA_returnStmt rs);
+
+void check_Convert(std::ostream* out, A_pos pos, aA_type left, aA_type right);
+void check_Compare(std::ostream* out, A_pos pos, aA_type left, aA_type right);
+void check_scalarExists(std::ostream* out, A_pos pos, string name);
