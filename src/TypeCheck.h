@@ -46,4 +46,6 @@ void check_ReturnStmt(std::ostream* out, aA_returnStmt rs);
 
 void check_Convert(std::ostream* out, A_pos pos, aA_type left, aA_type right);
 void check_Compare(std::ostream* out, A_pos pos, aA_type left, aA_type right);
-void check_scalarExists(std::ostream* out, A_pos pos, string name);
+void check_scalarExists(std::ostream* out, A_pos pos,
+                        string name);  // 对于局部变量的取消注册
+void cancelStmtRegis(std::ostream* out, aA_varDeclStmt vd);
