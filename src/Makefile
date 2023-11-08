@@ -1,4 +1,4 @@
-CXX = g++
+CXX = clang++
 CXXFLAGS = -std=c++17 -g
 
 TESTCASE_DIR := tests

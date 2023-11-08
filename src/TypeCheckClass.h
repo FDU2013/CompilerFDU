@@ -15,6 +15,9 @@ using my_Var = std::shared_ptr<VarDeclCheckProxy>;
 using my_Func = std::shared_ptr<FnProxy>;
 using my_Struct = std::shared_ptr<StructProxy>;
 
+using my_Scalar = std::shared_ptr<ScalarDeclProxy>;
+using my_Array = std::shared_ptr<ArrayDeclProxy>;
+
 using varMap = std::unordered_map<string, my_Var>;
 using funcMap = std::unordered_map<string, my_Func>;
 using structMap = std::unordered_map<string, my_Struct>;
@@ -26,14 +29,11 @@ structMap token2Struct;
 
 funcMap token2Func;
 
-void error_print(std::ostream* out, A_pos p, string info);
-void check_g_varName(std::ostream* out, A_pos pos, string name);
-void check_l_varName(std::ostream* out, A_pos pos, string name);
-
-bool Equal(aA_type type1, aA_type type2);
-aA_type get_RightValType(std::ostream* out, aA_rightVal rl);
-string get_TypeName(aA_type type);
-void check_Convert(std::ostream* out, A_pos pos, aA_type left, aA_type right);
+static void error_print(std::ostream* out, A_pos p, string info) {
+  *out << "Typecheck error in line " << p->line << ", col " << p->col << ": "
+       << info << std::endl;
+  exit(0);
+}
 
 class VarDeclCheckProxyFactory {
  public:
@@ -94,6 +94,9 @@ class VarDeclCheckProxy {
   }
 
   string getName() { return name_; }
+  aA_type getType() { return type_; }
+
+  virtual bool isScalar() { return true; }
 
  protected:
   bool global_;
@@ -158,6 +161,9 @@ class ArrayDeclProxy : public VarDeclCheckProxy {
     // }
     size_ = vd->u.varDef->u.defArray->len;
   }
+  int getSize() { return size_; }
+
+  virtual bool isScalar() override { return false; }
 
  protected:
   int size_;
@@ -229,7 +235,7 @@ class FnProxy {
     }
   }
 
-  void Define(std::ostream* out, aA_fnDef fd) {
+  void CheckDefine(std::ostream* out, aA_fnDef fd) {
     vector<string> params;
     for (aA_varDecl vd : fd->fnDecl->paramDecl->varDecls) {
       aA_varDeclStmt vdStmt = new aA_varDeclStmt_;
@@ -248,10 +254,56 @@ class FnProxy {
       check_CodeblockStmt(out, cs);
     }
 
+    for (auto codeBlockStmt : fd->stmts) {
+      switch (codeBlockStmt->kind) {
+        case A_varDeclStmtKind:
+          erase_localVar(codeBlockStmt->u.varDeclStmt);
+          break;
+        default:
+          break;
+      }
+    }
     for (auto param : params) {
-      l_token2Var[param]->Unregister();
+      // l_token2Var[param]->Unregister();
       l_token2Var.erase(param);
     }
+  }
+
+  void CheckCall(std::ostream* out, aA_fnCall fc) {
+    if (fc->vals.size() != params_.size()) {
+      goto error;
+    }
+    for (int i = 0; i < fc->vals.size(); i++) {
+      aA_rightVal val = fc->vals[i];
+      aA_varDecl param = params_[i];
+      if (param->kind == A_varDeclType::A_varDeclScalarKind) {
+        aA_varDeclScalar scalar = param->u.declScalar;
+        if (!Equal(get_RightValType(out, val), scalar->type)) {
+          goto error;
+        }
+      } else if (param->kind == A_varDeclType::A_varDeclArrayKind) {
+        if (val->kind == A_rightValType::A_arithExprValKind &&
+            val->u.arithExpr->kind == A_arithExprType::A_exprUnitKind &&
+            val->u.arithExpr->u.exprUnit->kind ==
+                A_exprUnitType::A_idExprKind) {
+          string name = *val->u.arithExpr->u.exprUnit->u.id;
+          aA_varDeclArray array = param->u.declArray;
+          int len = get_arraySize(name);
+          if (len != array->len) {
+            goto error;
+          }
+          if (!Equal(get_arrayType(name), array->type)) {
+            goto error;
+          }
+        } else {
+          goto error;
+        }
+      }
+    }
+  error:
+    error_print(out, fc->pos,
+                string("Function parameter \"") + *(fc->fn) +
+                    string("\" does not match."));
   }
 
  protected:
@@ -275,9 +327,7 @@ class FnProxy {
       aA_varDecl a = params_[i];
       aA_varDecl b = target[i];
       if (a->kind == A_varDeclScalarKind && b->kind == A_varDeclScalarKind) {
-        aA_varDeclScalar aScalar = a->u.declScalar;
-        aA_varDeclScalar bScalar = b->u.declScalar;
-        if (!Equal(aScalar->type, bScalar->type)) {
+        if (!Equal(a->u.declScalar->type, b->u.declScalar->type)) {
           goto error;
         }
       } else if (a->kind == A_varDeclArrayKind &&
@@ -297,11 +347,35 @@ class FnProxy {
 };
 
 class StructProxy {
+ public:
+  StructProxy(std::ostream* out, aA_structDef sd) {
+    // if (token2Struct.find(*(sd->id)) != token2Struct.end()) {
+    //   error_print(out, sd->pos, " struct redefine: " + *sd->id);
+    //   return;
+    // }
+    members_ = sd->varDecls;
+    defPos_ = sd->pos;
+    name_ = *sd->id;
+  }
+
+  aA_type CheckMember(std::ostream* out, A_pos pos, string member) {
+    for (auto memDecl : members_) {
+      if (memDecl->kind == A_varDeclType::A_varDeclScalarKind) {
+        if (memDecl->u.declScalar->id->compare(member) == 0)
+          return memDecl->u.declScalar->type;
+      } else {
+        if (memDecl->u.declArray->id->compare(member) == 0)
+          return memDecl->u.declScalar->type;
+      }
+    }
+    error_print(out, pos,
+                string("' struct '") + name_ +
+                    string("' doesn't have member '") + member + string("'."));
+    return nullptr;
+  }
+
  protected:
-  bool defined_;
   string name_;
-  A_pos pos_;
-  aA_type ret_type_;
-  vector<aA_varDecl> params_;
-  std::ostream* out_;
+  A_pos defPos_;
+  vector<aA_varDecl> members_;
 };

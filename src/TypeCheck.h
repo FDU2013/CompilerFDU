@@ -49,3 +49,13 @@ void check_Compare(std::ostream* out, A_pos pos, aA_type left, aA_type right);
 void check_scalarExists(std::ostream* out, A_pos pos,
                         string name);  // 对于局部变量的取消注册
 void cancelStmtRegis(std::ostream* out, aA_varDeclStmt vd);
+
+void check_g_varName(std::ostream* out, A_pos pos, string name);
+void check_l_varName(std::ostream* out, A_pos pos, string name);
+
+bool Equal(aA_type type1, aA_type type2);
+aA_type get_RightValType(std::ostream* out, aA_rightVal rl);
+string get_TypeName(aA_type type);
+void erase_localVar(aA_varDeclStmt vd);
+
+int get_arraySize(string name);
