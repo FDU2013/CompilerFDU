@@ -56,11 +56,6 @@ void error_print(std::ostream* out, A_pos p, string info) {
   exit(0);
 }
 
-void nullptr_print(std::ostream* out, string info) {
-  *out << "find nullptr in :" << info << std::endl;
-  exit(0);
-}
-
 void print_token_map(typeMap* map) {
   for (auto it = map->begin(); it != map->end(); it++) {
     std::cout << it->first << " : ";
@@ -408,66 +403,41 @@ void erase_localVar(aA_codeBlockStmt cb) {
 void check_BoolExpr(std::ostream* out, aA_boolExpr be) {
   if (!be) return;
   switch (be->kind) {
-    case A_boolExprType::A_boolBiOpExprKind: {
-      aA_type left_type = check_BoolExpr(out, be->u.boolBiOpExpr->left);
-      if (!assertBoolType(left_type)) {
-        error_print(out, be->u.boolBiOpExpr->left->pos,
-                    string("should be bool type."));
-      }
-      aA_type right_type = check_BoolExpr(out, be->u.boolBiOpExpr->right);
-      if (!assertBoolType(right_type)) {
-        error_print(out, be->u.boolBiOpExpr->right->pos,
-                    string("should be bool type."));
-      }
-    } break;
-    case A_boolExprType::A_boolUnitKind: {
-      aA_type ret = check_BoolUnit(out, be->u.boolUnit);
-      if (!assertBoolType(ret)) {
-        error_print(out, be->u.boolUnit->pos, string("should be bool type."));
-      }
-      return ret;
-    } break;
+    case A_boolExprType::A_boolBiOpExprKind:
+      /* write your code here */
+      check_BoolExpr(out, be->u.boolBiOpExpr->left);
+      check_BoolExpr(out, be->u.boolBiOpExpr->right);
+      break;
+    case A_boolExprType::A_boolUnitKind:
+      check_BoolUnit(out, be->u.boolUnit);
+      break;
     default:
       break;
   }
-  return newBoolType(be->pos);
+  return;
 }
 
-aA_type check_BoolUnit(std::ostream* out, aA_boolUnit bu) {
-  if (!bu) {
-    nullptr_print(out, "check_BoolUnit");
-    return nullptr;
-  }
+void check_BoolUnit(std::ostream* out, aA_boolUnit bu) {
+  if (!bu) return;
   switch (bu->kind) {
     case A_boolUnitType::A_comOpExprKind: {
-      aA_type left_type = check_ExprUnit(out, bu->u.comExpr->left);
-      aA_type right_type = check_ExprUnit(out, bu->u.comExpr->right);
-      if (!assertIntType(left_type) || !assertIntType(right_type)) {
-        error_print(out, bu->u.comExpr->pos,
-                    get_TypeName(left_type) +
-                        string(" is not comparable with ") +
-                        get_TypeName(right_type) + string("."));
-      }
+      /* write your code here */
+      check_Compare(out, bu->u.comExpr->pos,
+                    check_ExprUnit(out, bu->u.comExpr->left),
+                    check_ExprUnit(out, bu->u.comExpr->right));
     } break;
-    case A_boolUnitType::A_boolExprKind: {
-      aA_type ret = check_BoolExpr(out, bu->u.boolExpr);
-      if (!assertBoolType(ret)) {
-        error_print(out, bu->u.boolExpr->pos, string("should be bool type."));
-      }
-      return ret;
-    } break;
-    case A_boolUnitType::A_boolUOpExprKind: {
-      aA_type ret = check_BoolUnit(out, bu->u.boolUOpExpr->cond);
-      if (!assertBoolType(ret)) {
-        error_print(out, bu->u.boolUOpExpr->cond->pos,
-                    string("should be bool type."));
-      }
-      return ret;
-    } break;
+    case A_boolUnitType::A_boolExprKind:
+      /* write your code here */
+      check_BoolExpr(out, bu->u.boolExpr);
+      break;
+    case A_boolUnitType::A_boolUOpExprKind:
+      /* write your code here */
+      check_BoolUnit(out, bu->u.boolUOpExpr->cond);
+      break;
     default:
       break;
   }
-  return newBoolType(bu->pos);
+  return;
 }
 
 aA_type check_ExprUnit(std::ostream* out, aA_exprUnit eu) {
