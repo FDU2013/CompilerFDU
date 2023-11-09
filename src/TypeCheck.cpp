@@ -36,6 +36,11 @@ void error_print(std::ostream* out, A_pos p, string info) {
   exit(0);
 }
 
+void nullptr_print(std::ostream* out,string info){
+  *out<<"find nullptr in :"<< info << std::endl;
+  exit(0);
+}
+
 void print_token_map(typeMap* map) {
   for (auto it = map->begin(); it != map->end(); it++) {
     std::cout << it->first << " : ";
@@ -236,8 +241,11 @@ void check_FnDef(std::ostream* out, aA_fnDef fd) {
   }
 }
 
-void check_CodeblockStmt(std::ostream* out, aA_codeBlockStmt cs) {
-  if (!cs) return;
+void check_CodeblockStmt(std::ostream* out, aA_codeBlockStmt cs,aA_type f_type) {
+  if (!cs){
+    nullptr_print(out,"check_CodeblockStmt");
+    return;
+  }
   switch (cs->kind) {
     case A_codeBlockStmtType::A_varDeclStmtKind:
       check_LocalVarDecl(out, cs->u.varDeclStmt);
@@ -246,16 +254,16 @@ void check_CodeblockStmt(std::ostream* out, aA_codeBlockStmt cs) {
       check_AssignStmt(out, cs->u.assignStmt);
       break;
     case A_codeBlockStmtType::A_ifStmtKind:
-      check_IfStmt(out, cs->u.ifStmt);
+      check_IfStmt(out, cs->u.ifStmt,f_type);
       break;
     case A_codeBlockStmtType::A_whileStmtKind:
-      check_WhileStmt(out, cs->u.whileStmt);
+      check_WhileStmt(out, cs->u.whileStmt,f_type);
       break;
     case A_codeBlockStmtType::A_callStmtKind:
       check_CallStmt(out, cs->u.callStmt);
       break;
     case A_codeBlockStmtType::A_returnStmtKind:
-      check_ReturnStmt(out, cs->u.returnStmt);
+      check_ReturnStmt(out, cs->u.returnStmt,f_type);
       break;
     default:
       break;
@@ -344,12 +352,12 @@ aA_type check_MemberExpr(std::ostream* out, aA_memberExpr me) {
 }
 
 // 检查if语句
-void check_IfStmt(std::ostream* out, aA_ifStmt is) {
+void check_IfStmt(std::ostream* out, aA_ifStmt is,aA_type f_type) {
   if (!is) return;
   check_BoolExpr(out, is->boolExpr);
   // 对每个if语句进行判断
   for (aA_codeBlockStmt s : is->ifStmts) {
-    check_CodeblockStmt(out, s);
+    check_CodeblockStmt(out, s, f_type);
   }
   // TODO：对于局部变量的注册取消掉
   // 只有对于变量声明的语句要取消掉
@@ -359,7 +367,7 @@ void check_IfStmt(std::ostream* out, aA_ifStmt is) {
     }
   }
   for (aA_codeBlockStmt s : is->elseStmts) {
-    check_CodeblockStmt(out, s);
+    check_CodeblockStmt(out, s, f_type);
   }
   for (aA_codeBlockStmt s : is->elseStmts) {
     if (s->kind == A_codeBlockStmtType::A_varDeclStmtKind) {
@@ -369,46 +377,72 @@ void check_IfStmt(std::ostream* out, aA_ifStmt is) {
   return;
 }
 
-void cancelStmtRegis(std::ostream* out, aA_varDeclStmt);
-
-void check_BoolExpr(std::ostream* out, aA_boolExpr be) {
-  if (!be) return;
+aA_type check_BoolExpr(std::ostream* out, aA_boolExpr be) {
+  if (!be){
+    nullptr_print(out,"check_BoolExpr");
+    return nullptr;
+  }
   switch (be->kind) {
-    case A_boolExprType::A_boolBiOpExprKind:
-      /* write your code here */
-      check_BoolExpr(out, be->u.boolBiOpExpr->left);
-      check_BoolExpr(out, be->u.boolBiOpExpr->right);
-      break;
-    case A_boolExprType::A_boolUnitKind:
-      check_BoolUnit(out, be->u.boolUnit);
-      break;
+    case A_boolExprType::A_boolBiOpExprKind: {
+      aA_type left_type = check_BoolExpr(out, be->u.boolBiOpExpr->left);
+      if (!assertBoolType(left_type)) {
+        error_print(out, be->u.boolBiOpExpr->left->pos,
+                    string("should be bool type."));
+      }
+      aA_type right_type = check_BoolExpr(out, be->u.boolBiOpExpr->right);
+      if (!assertBoolType(right_type)) {
+        error_print(out, be->u.boolBiOpExpr->right->pos,
+                    string("should be bool type."));
+      }
+    } break;
+    case A_boolExprType::A_boolUnitKind: {
+      aA_type ret = check_BoolUnit(out, be->u.boolUnit);
+      if (!assertBoolType(ret)) {
+        error_print(out, be->u.boolUnit->pos, string("should be bool type."));
+      }
+      return ret;
+    } break;
     default:
       break;
   }
-  return;
+  return newBoolType(be->pos);
 }
 
-void check_BoolUnit(std::ostream* out, aA_boolUnit bu) {
-  if (!bu) return;
+aA_type check_BoolUnit(std::ostream* out, aA_boolUnit bu) {
+  if (!bu) {
+    nullptr_print(out, "check_BoolUnit");
+    return nullptr;
+  }
   switch (bu->kind) {
     case A_boolUnitType::A_comOpExprKind: {
-      /* write your code here */
-      check_Compare(out, bu->u.comExpr->pos,
-                    check_ExprUnit(out, bu->u.comExpr->left),
-                    check_ExprUnit(out, bu->u.comExpr->right));
+      aA_type left_type = check_ExprUnit(out, bu->u.comExpr->left);
+      aA_type right_type = check_ExprUnit(out, bu->u.comExpr->right);
+      if (!assertIntType(left_type) || !assertIntType(right_type)) {
+        error_print(out, bu->u.comExpr->pos,
+                    get_TypeName(left_type) +
+                        string(" is not comparable with ") +
+                        get_TypeName(right_type) + string("."));
+      }
     } break;
-    case A_boolUnitType::A_boolExprKind:
-      /* write your code here */
-      check_BoolExpr(out, bu->u.boolExpr);
-      break;
-    case A_boolUnitType::A_boolUOpExprKind:
-      /* write your code here */
-      check_BoolUnit(out, bu->u.boolUOpExpr->cond);
-      break;
+    case A_boolUnitType::A_boolExprKind: {
+      aA_type ret = check_BoolExpr(out, bu->u.boolExpr);
+      if (!assertBoolType(ret)) {
+        error_print(out, bu->u.boolExpr->pos, string("should be bool type."));
+      }
+      return ret;
+    } break;
+    case A_boolUnitType::A_boolUOpExprKind: {
+      aA_type ret = check_BoolUnit(out, bu->u.boolUOpExpr->cond);
+      if (!assertBoolType(ret)) {
+        error_print(out, bu->u.boolUOpExpr->cond->pos,
+                    string("should be bool type."));
+      }
+      return ret;
+    } break;
     default:
       break;
   }
-  return;
+  return newBoolType(bu->pos);
 }
 
 aA_type check_ExprUnit(std::ostream* out, aA_exprUnit eu) {
@@ -462,11 +496,19 @@ void check_FuncCall(std::ostream* out, aA_fnCall fc) {
   return;
 }
 
-void check_WhileStmt(std::ostream* out, aA_whileStmt ws) {
-  if (!ws) return;
+void check_WhileStmt(std::ostream* out, aA_whileStmt ws,aA_type f_type) {
+  if (!ws) {
+    nullptr_print(out, "check_WhileStmt");
+    return;
+  }
   check_BoolExpr(out, ws->boolExpr);
   for (aA_codeBlockStmt s : ws->whileStmts) {
-    check_CodeblockStmt(out, s);
+    check_CodeblockStmt(out, s, f_type);
+  }
+  for (aA_codeBlockStmt s : ws->whileStmts) {
+    if (s->kind == A_codeBlockStmtType::A_varDeclStmtKind) {
+      cancelStmtRegis(out, s->u.varDeclStmt);
+    }
   }
   return;
 }
@@ -477,8 +519,18 @@ void check_CallStmt(std::ostream* out, aA_callStmt cs) {
   return;
 }
 
-void check_ReturnStmt(std::ostream* out, aA_returnStmt rs) {
-  if (!rs) return;
+void check_ReturnStmt(std::ostream* out, aA_returnStmt rs,aA_type f_type) {
+ if (!rs) {
+    nullptr_print(out, "check_ReturnStmt");
+    return;
+  }
+  aA_type ret_type = get_RightValType(out, rs->retVal);
+  if (!Equal(ret_type, f_type)) {
+    error_print(out, ret_type->pos,
+                string("return type ") + get_TypeName(ret_type) +
+                    string(" not match function return type: ") +
+                    get_TypeName(f_type) + string(" ."));
+  }
   return;
 }
 
@@ -693,4 +745,28 @@ int get_arraySize(string name) {
   }
 
   return -1;
+}
+
+aA_type newBoolType(A_pos pos){
+  aA_type type = new aA_type_;
+  type->pos = pos;
+  type->type = A_dataType::A_structTypeKind;
+  type->u.structType = new string("bool");
+  return type;
+}
+
+bool assertBoolType(aA_type type) {
+  if (type == nullptr) return false;
+  if (type->type == A_dataType::A_nativeTypeKind) return false;
+  return type->u.structType->compare(string("bool")) == 0;
+}
+
+bool assertIntType(aA_type type) {
+  if (type == nullptr) return false;
+  if (type->type == A_dataType::A_structTypeKind) return false;
+  return type->u.nativeType == A_nativeType::A_intTypeKind;
+}
+
+void cancelStmtRegis(std::ostream* out, aA_varDeclStmt vd){
+  return;
 }
