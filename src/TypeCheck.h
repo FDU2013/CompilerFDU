@@ -26,9 +26,12 @@ typedef std::map<string, int> arraySizeMap;
 typedef std::unordered_set<string> funcSet;
 
 class VarDeclCheckProxy;
+class ScalarDeclProxy;
+class ArrayDeclProxy;
 class FnProxy;
 class StructProxy;
 class VarDeclCheckProxyFactory;
+
 // typedef std::shared_ptr<VarDeclCheckProxy> my_Var;
 
 using my_Var = std::shared_ptr<VarDeclCheckProxy>;
@@ -42,12 +45,6 @@ using varMap = std::unordered_map<string, my_Var>;
 using funcMap = std::unordered_map<string, my_Func>;
 using structMap = std::unordered_map<string, my_Struct>;
 
-varMap g_token2Var;
-varMap l_token2Var;
-
-structMap token2Struct;
-
-funcMap token2Func;
 
 void check_Prog(std::ostream* out, aA_program p);
 void check_VarDecl(std::ostream* out, aA_varDeclStmt vd);
@@ -76,21 +73,33 @@ void check_ReturnStmt(std::ostream* out, aA_returnStmt rs, aA_type expected);
 void check_Convert(std::ostream* out, A_pos pos, aA_type left, aA_type right);
 void check_Compare(std::ostream* out, A_pos pos, aA_type left, aA_type right);
 void check_scalarExists(std::ostream* out, A_pos pos,
-                        string name);  // 对于局部变量的取消注册
+                        string name);  
+my_Var check_arrayExists(std::ostream* out, A_pos pos, string name);
 void cancelStmtRegis(std::ostream* out, aA_varDeclStmt vd);
 
 void check_g_varName(std::ostream* out, A_pos pos, string name);
 void check_l_varName(std::ostream* out, A_pos pos, string name);
 
+void check_FnPreDef(std::ostream* out, aA_fnDef fd) ;
+aA_type check_ArithBiOpExpr(std::ostream* out, aA_arithBiOpExpr aboe);
+aA_type check_ArithUExpr(std::ostream* out, aA_arithUExpr aue) ;
+aA_type check_ArithExpr(std::ostream* out, aA_arithExpr ae);
+
 bool Equal(aA_type type1, aA_type type2);
 aA_type get_RightValType(std::ostream* out, aA_rightVal rl);
 string get_TypeName(aA_type type);
+aA_type get_varType(string name);
 aA_type get_arrayType(string name);
 aA_type get_scalarType(string name);
 void erase_localVar(aA_varDeclStmt vd);
+my_Var get_myVar(std::ostream* out, A_pos pos, string name);
+bool check_NativeType(aA_type target, A_nativeType type);
 
+bool check_StructType(aA_type target, string type);
 int get_arraySize(string name);
 void erase_localVar(aA_codeBlockStmt cb);
+void check_GlobalVarDecl(std::ostream* out, aA_varDeclStmt vd);
+void check_LocalVarDecl(std::ostream* out, aA_varDeclStmt vd, bool isParam);
 
 class VarDeclCheckProxyFactory {
  public:
@@ -162,6 +171,7 @@ class ArrayDeclProxy : public VarDeclCheckProxy {
   virtual void ConfigTable() override;
 
   virtual void EraseTable() override;
+
 };
 
 class ArrayDefProxy : public ArrayDeclProxy {
@@ -181,9 +191,9 @@ class FnProxy {
 
   FnProxy(std::ostream* out, aA_fnDef fd);
 
-  string getName() { return name_; }
+  string getName();
 
-  bool isDefined() { return defined_; }
+  bool isDefined();
 
   void CheckDecl(std::ostream* out, aA_fnDecl fd);
 
@@ -194,6 +204,7 @@ class FnProxy {
   aA_type getRetType();
 
  protected:
+  // bool decleared_; 
   bool defined_;
   string name_;
   A_pos defPos_;

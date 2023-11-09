@@ -2,9 +2,13 @@
 
 #include <memory>
 #include <string>
+#include <iostream>
 
 #include "TeaplAst.h"
 #include "TeaplaAst.h"
+
+using std::cout;
+using std::endl;
 
 // maps to store the type information. Feel free to design new data
 // structures if you need.
@@ -15,6 +19,14 @@
 
 // paramMemberMap func2Param;
 // paramMemberMap struct2Members;
+
+varMap g_token2Var;
+varMap l_token2Var;
+
+structMap token2Struct;
+
+funcMap token2Func;
+
 
 static auto boolup = std::make_unique<aA_type_>();
 static auto intup = std::make_unique<aA_type_>();
@@ -105,15 +117,18 @@ void check_Prog(std::ostream* out, aA_program p) {
 
   for (auto ele : p->programElements) {
     if (ele->kind == A_programFnDeclStmtKind) {
+      //cout << "func decl" << endl;
       check_FnDeclStmt(out, ele->u.fnDeclStmt);
     }
     if (ele->kind == A_programFnDefKind) {
+      //cout << "func def" << endl;
       check_FnPreDef(out, ele->u.fnDef);
     }
   }
 
   for (auto ele : p->programElements) {
     if (ele->kind == A_programFnDefKind) {
+      //cout << "check func def" << endl;
       check_FnDef(out, ele->u.fnDef);
     }
   }
@@ -133,6 +148,7 @@ void check_GlobalVarDecl(std::ostream* out, aA_varDeclStmt vd) {
 void check_LocalVarDecl(std::ostream* out, aA_varDeclStmt vd,
                         bool isParam = false) {
   if (!vd) return;
+
   auto decl =
       VarDeclCheckProxyFactory::CreateVarDeclProxy(out, vd, false, isParam);
   decl->CheckStmt();
@@ -217,12 +233,14 @@ void check_FnDeclStmt(std::ostream* out, aA_fnDeclStmt fd) {
 
 void check_FnPreDef(std::ostream* out, aA_fnDef fd) {
   auto it = token2Func.find(*fd->fnDecl->id);
+
   if (it != token2Func.end()) {
-    error_print(out, fd->pos,
-                string("function has defined on position: ") +
-                    std::to_string(fd->pos->line));
-  }
-  if (!it->second->isDefined()) {
+    if (it->second->isDefined()) {
+      error_print(out, fd->pos,
+                  string("function has defined on position: ") +
+                      std::to_string(fd->pos->line));
+      return;
+    }
     my_Func func = it->second;
     func->CheckDecl(out, fd->fnDecl);
   } else {
@@ -293,24 +311,24 @@ void check_AssignStmt(std::ostream* out, aA_assignStmt as) {
     case A_leftValType::A_varValKind: {
       /* write your code here */
       check_scalarExists(out, as->leftVal->pos, *as->leftVal->u.id);
+      leftType = get_varType(*as->leftVal->u.id);
     } break;
     case A_leftValType::A_arrValKind: {
       /* write your code here */
-      check_ArrayExpr(out, as->leftVal->u.arrExpr);
+      leftType = check_ArrayExpr(out, as->leftVal->u.arrExpr);
     } break;
     case A_leftValType::A_memberValKind: {
       /* write your code here */
-      check_MemberExpr(out, as->leftVal->u.memberExpr);
+      leftType = check_MemberExpr(out, as->leftVal->u.memberExpr);
     } break;
   }
-  leftType = get_varType(*as->leftVal->u.id);
   rightType = get_RightValType(out, as->rightVal);
   check_Convert(out, as->rightVal->pos, leftType, rightType);
   return;
 }
 
 aA_type check_ArrayExpr(std::ostream* out, aA_arrayExpr ae) {
-  if (!ae) return;
+  if (!ae) return nullptr;
   /*
       Example:
           a[1] = 0;
@@ -519,7 +537,7 @@ aA_type check_ArithBiOpExpr(std::ostream* out, aA_arithBiOpExpr aboe) {
 }
 
 aA_type check_FuncCall(std::ostream* out, aA_fnCall fc) {
-  if (!fc) return;
+  if (!fc) return nullptr;
   // Example:
   //      foo(1, 2);
 
@@ -540,6 +558,11 @@ void check_WhileStmt(std::ostream* out, aA_whileStmt ws, my_Func func) {
   check_BoolExpr(out, ws->boolExpr);
   for (aA_codeBlockStmt s : ws->whileStmts) {
     check_CodeblockStmt(out, s, func);
+  }
+  for (auto s : ws->whileStmts){
+    if (s->kind == A_codeBlockStmtType::A_varDeclStmtKind){
+      erase_localVar(s);
+    }
   }
   return;
 }
@@ -589,6 +612,7 @@ aA_type get_RightValType(std::ostream* out, aA_rightVal rl) {
   if (rl->kind == A_rightValType::A_boolExprValKind) {
     return Bool_aAType;
   }
+  cout << "null in get_RightValType" << endl;
   return nullptr;
 }
 
@@ -633,8 +657,8 @@ string get_TypeName(aA_type type) {
 void check_Convert(std::ostream* out, A_pos pos, aA_type left, aA_type right) {
   if (!Equal(left, right)) {
     error_print(out, pos,
-                string("cannot convert ") + get_TypeName(left) +
-                    string(" to ") + get_TypeName(right) + string(" ."));
+                string("cannot convert ") + get_TypeName(right) +
+                    string(" to ") + get_TypeName(left) + string(" ."));
   }
 }
 
@@ -676,6 +700,7 @@ void check_Compare(std::ostream* out, A_pos pos, aA_type left, aA_type right) {
       right->u.nativeType != A_nativeType::A_intTypeKind)
     goto error;
 
+  return;
 error:
   error_print(out, pos,
               get_TypeName(left) + " can't compare to " + get_TypeName(right));
@@ -703,40 +728,43 @@ aA_type get_varType(string name) {
     return g_it->second->getType();
   }
 
+  cout << "null in get_varType" << endl;
   return nullptr;
 }
 
 aA_type get_scalarType(string name) {
   auto l_it = l_token2Var.find(name);
   if (l_it != l_token2Var.end()) {
-    return dynamic_cast<ScalarDeclProxy*>(l_it->second.get()) == nullptr
-               ? nullptr
-               : l_it->second->getType();
+    return l_it->second->isScalar()
+               ? l_it->second->getType()
+               : nullptr;
   }
   auto g_it = g_token2Var.find(name);
   if (g_token2Var.count(name) > 0) {
-    return dynamic_cast<ScalarDeclProxy*>(g_it->second.get()) == nullptr
-               ? nullptr
-               : g_it->second->getType();
+    return l_it->second->isScalar()
+               ? g_it->second->getType()
+               : nullptr;
   }
 
+  cout << "null in get_scalarType" << endl;
   return nullptr;
 }
 
 aA_type get_arrayType(string name) {
   auto l_it = l_token2Var.find(name);
   if (l_it != l_token2Var.end()) {
-    return dynamic_cast<ArrayDeclProxy*>(l_it->second.get()) == nullptr
+    return l_it->second->isScalar()
                ? nullptr
                : l_it->second->getType();
   }
   auto g_it = g_token2Var.find(name);
   if (g_token2Var.count(name) > 0) {
-    return dynamic_cast<ArrayDeclProxy*>(g_it->second.get()) == nullptr
+    return l_it->second->isScalar()
                ? nullptr
                : g_it->second->getType();
   }
 
+  cout << "null in get_arrayType" << endl;
   return nullptr;
 }
 
@@ -775,8 +803,8 @@ int get_arraySize(string name) {
 
 my_Var VarDeclCheckProxyFactory::CreateVarDeclProxy(std::ostream* out,
                                                     aA_varDeclStmt vd,
-                                                    bool isGlobal = true,
-                                                    bool isParam = false) {
+                                                    bool isGlobal,
+                                                    bool isParam) {
   if (vd->kind == A_varDeclStmtType::A_varDeclKind) {
     if (vd->u.varDecl->kind == A_varDeclType::A_varDeclScalarKind) {
       return std::make_shared<ScalarDeclProxy>(out, vd, isGlobal, isParam);
@@ -790,6 +818,7 @@ my_Var VarDeclCheckProxyFactory::CreateVarDeclProxy(std::ostream* out,
       return std::make_shared<ArrayDefProxy>(out, vd, isGlobal, isParam);
     }
   }
+  cout << "null in CreateVarDeclProxy" << endl;
   return nullptr;
 }
 
@@ -866,6 +895,7 @@ ArrayDeclProxy::ArrayDeclProxy(std::ostream* out, aA_varDeclStmt vd,
   //   token2Szie_ = &l_token2Size;
   // }
   size_ = vd->u.varDef->u.defArray->len;
+  
 }
 int ArrayDeclProxy::getSize() { return size_; }
 
@@ -921,7 +951,11 @@ string FnProxy::getName() { return name_; }
 bool FnProxy::isDefined() { return defined_; }
 
 void FnProxy::CheckDecl(std::ostream* out, aA_fnDecl fd) {
-  check_g_varName(out, fd->pos, *fd->id);
+  // if(!decleared_){
+  //   check_g_varName(out, fd->pos, *fd->id);
+  // } else {
+  //   decleared_ = true;
+  // }
   CheckParams(out, fd);
   if (!Equal(fd->type, ret_type_)) {
     error_print(out, fd->pos, "return type conflicts.");
@@ -929,6 +963,7 @@ void FnProxy::CheckDecl(std::ostream* out, aA_fnDecl fd) {
 }
 
 void FnProxy::CheckDefine(std::ostream* out, aA_fnDef fd) {
+  defined_ = true;
   vector<string> params;
   for (aA_varDecl vd : fd->fnDecl->paramDecl->varDecls) {
     aA_varDeclStmt vdStmt = new aA_varDeclStmt_;
@@ -943,7 +978,7 @@ void FnProxy::CheckDefine(std::ostream* out, aA_fnDef fd) {
     l_token2Var.emplace(decl->getName(), decl);
   }
 
-  for (auto cs : fd->stmts) {
+  for (auto cs: fd->stmts) {
     check_CodeblockStmt(out, cs, token2Func[name_]);
   }
 
@@ -992,6 +1027,8 @@ void FnProxy::CheckCall(std::ostream* out, aA_fnCall fc) {
       }
     }
   }
+
+  return;
 error:
   error_print(out, fc->pos,
               string("Function parameter \"") + *(fc->fn) +
@@ -1010,6 +1047,7 @@ void FnProxy::CheckParams(std::ostream* out, aA_fnDecl fd) {
   auto& target = fd->paramDecl->varDecls;
 
   if (target.size() != params_.size()) goto error;
+  
   for (int i = 0; i < params_.size(); i++) {
     aA_varDecl a = params_[i];
     aA_varDecl b = target[i];
@@ -1026,6 +1064,7 @@ void FnProxy::CheckParams(std::ostream* out, aA_fnDecl fd) {
       goto error;
     }
   }
+  return;
 error:
   error_print(out, fd->pos, "Function overloading is not currently supported.");
 }

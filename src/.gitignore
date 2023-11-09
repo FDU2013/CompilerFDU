@@ -1,3 +1,6 @@
 *.o
 *.output
 tests/*.ast
+src/y.tab.cpp
+src/y.tab.hpp
+compiler
