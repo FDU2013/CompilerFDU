@@ -5,29 +5,49 @@
 
 #include "TeaplAst.h"
 #include "TeaplaAst.h"
-#include "TypeCheckClass.h"
 
 // maps to store the type information. Feel free to design new data
 // structures if you need.
-typeMap g_token2Type;  // global token ids to type
-typeMap l_token2Type;  // local token ids to type
+// typeMap g_token2Type;  // global token ids to type
+// typeMap l_token2Type;  // local token ids to type
 
-typeMap funcparam_token2Type;  // func params token ids to type
+// typeMap funcparam_token2Type;  // func params token ids to type
 
-paramMemberMap func2Param;
-paramMemberMap struct2Members;
+// paramMemberMap func2Param;
+// paramMemberMap struct2Members;
 
-// 函数map
-funcSet funcDefs;
-funcSet funcDelcs;
+static auto boolup = std::make_unique<aA_type_>();
+static auto intup = std::make_unique<aA_type_>();
 
-// 位置map
-posMap func2Pos;
-posMap g_token2Pos;
-posMap l_token2Pos;
+static aA_type Bool_aAType = []() {
+  aA_type boolType = boolup.get();
+  boolType->type = A_dataType::A_structTypeKind;
+  boolType->u.structType = new string("bool");
+  return boolType;
+}();
 
-arraySizeMap g_token2Size;
-arraySizeMap l_token2Size;
+static aA_type Int_aAType = []() {
+  aA_type intType = intup.get();
+  intType->type = A_dataType::A_nativeTypeKind;
+  intType->u.nativeType = A_nativeType::A_intTypeKind;
+  return intType;
+}();
+
+static aA_type BoolTypeTmp(A_pos pos) {
+  aA_type type = new aA_type_;
+  type->pos = pos;
+  type->type = A_dataType::A_structTypeKind;
+  type->u.structType = new string("bool");
+  return type;
+}
+
+static aA_type IntTypeTmp(A_pos pos) {
+  aA_type type = new aA_type_;
+  type->pos = pos;
+  type->type = A_dataType::A_nativeTypeKind;
+  type->u.nativeType = A_nativeType::A_intTypeKind;
+  return type;
+}
 
 // private util functions. You can use these functions to help you debug.
 void error_print(std::ostream* out, A_pos p, string info) {
@@ -236,7 +256,7 @@ void check_FnDef(std::ostream* out, aA_fnDef fd) {
   }
 }
 
-void check_CodeblockStmt(std::ostream* out, aA_codeBlockStmt cs) {
+void check_CodeblockStmt(std::ostream* out, aA_codeBlockStmt cs, my_Func func) {
   if (!cs) return;
   switch (cs->kind) {
     case A_codeBlockStmtType::A_varDeclStmtKind:
@@ -246,16 +266,16 @@ void check_CodeblockStmt(std::ostream* out, aA_codeBlockStmt cs) {
       check_AssignStmt(out, cs->u.assignStmt);
       break;
     case A_codeBlockStmtType::A_ifStmtKind:
-      check_IfStmt(out, cs->u.ifStmt);
+      check_IfStmt(out, cs->u.ifStmt, func);
       break;
     case A_codeBlockStmtType::A_whileStmtKind:
-      check_WhileStmt(out, cs->u.whileStmt);
+      check_WhileStmt(out, cs->u.whileStmt, func);
       break;
     case A_codeBlockStmtType::A_callStmtKind:
       check_CallStmt(out, cs->u.callStmt);
       break;
     case A_codeBlockStmtType::A_returnStmtKind:
-      check_ReturnStmt(out, cs->u.returnStmt);
+      check_ReturnStmt(out, cs->u.returnStmt, func->getRetType());
       break;
     default:
       break;
@@ -289,7 +309,7 @@ void check_AssignStmt(std::ostream* out, aA_assignStmt as) {
   return;
 }
 
-void check_ArrayExpr(std::ostream* out, aA_arrayExpr ae) {
+aA_type check_ArrayExpr(std::ostream* out, aA_arrayExpr ae) {
   if (!ae) return;
   /*
       Example:
@@ -298,16 +318,18 @@ void check_ArrayExpr(std::ostream* out, aA_arrayExpr ae) {
           check the validity of the array index
   */
   string name = *ae->arr;
-  auto array = check_arrayExists(out, ae->pos, name);
+  auto arrayVar = check_arrayExists(out, ae->pos, name);
+  auto array = static_cast<ArrayDeclProxy*>(arrayVar.get());
   if (ae->idx->kind == A_indexExprKind::A_idIndexKind) {
     check_scalarExists(out, ae->idx->pos, *ae->idx->u.id);
   } else {
-    int size = static_cast<ArrayDeclProxy*>(array.get())->getSize();
+    int size = array->getSize();
     if (size <= ae->idx->u.num)
       error_print(out, ae->idx->pos,
                   string("array index ") + std::to_string(ae->idx->u.num) +
                       string(" is out of range. "));
   }
+  return array->getType();
   // if (ae->idx->kind == A_indexExprKind::A_numIndexKind) {
   //   if (size <= ae->idx->u.num)
   //     error_print(out, ae->idx->pos,
@@ -344,32 +366,39 @@ aA_type check_MemberExpr(std::ostream* out, aA_memberExpr me) {
 }
 
 // 检查if语句
-void check_IfStmt(std::ostream* out, aA_ifStmt is) {
+void check_IfStmt(std::ostream* out, aA_ifStmt is, my_Func func) {
   if (!is) return;
   check_BoolExpr(out, is->boolExpr);
   // 对每个if语句进行判断
   for (aA_codeBlockStmt s : is->ifStmts) {
-    check_CodeblockStmt(out, s);
+    check_CodeblockStmt(out, s, func);
   }
-  // TODO：对于局部变量的注册取消掉
-  // 只有对于变量声明的语句要取消掉
+  // 于局部变量的注册取消掉
   for (aA_codeBlockStmt s : is->ifStmts) {
     if (s->kind == A_codeBlockStmtType::A_varDeclStmtKind) {
-      cancelStmtRegis(out, s->u.varDeclStmt);
+      erase_localVar(s);
     }
   }
   for (aA_codeBlockStmt s : is->elseStmts) {
-    check_CodeblockStmt(out, s);
+    check_CodeblockStmt(out, s, func);
   }
   for (aA_codeBlockStmt s : is->elseStmts) {
-    if (s->kind == A_codeBlockStmtType::A_varDeclStmtKind) {
-      cancelStmtRegis(out, s->u.varDeclStmt);
-    }
+    erase_localVar(s);
   }
   return;
 }
 
-void cancelStmtRegis(std::ostream* out, aA_varDeclStmt);
+void erase_localVar(aA_codeBlockStmt cb) {
+  if (cb->kind == A_codeBlockStmtType::A_varDeclStmtKind) {
+    switch (cb->kind) {
+      case A_varDeclStmtKind:
+        erase_localVar(cb->u.varDeclStmt);
+        break;
+      default:
+        break;
+    }
+  }
+}
 
 void check_BoolExpr(std::ostream* out, aA_boolExpr be) {
   if (!be) return;
@@ -422,31 +451,74 @@ aA_type check_ExprUnit(std::ostream* out, aA_exprUnit eu) {
     case A_exprUnitType::A_idExprKind: {
       /* write your code here */
       check_scalarExists(out, eu->pos, *eu->u.id);
-
+      return get_varType(*eu->u.id);
     } break;
     case A_exprUnitType::A_numExprKind: {
       /* write your code here */
+      return IntTypeTmp(eu->pos);
     } break;
     case A_exprUnitType::A_fnCallKind: {
       /* write your code here */
+      return check_FuncCall(out, eu->u.callExpr);
     } break;
     case A_exprUnitType::A_arrayExprKind: {
       /* write your code here */
+      return check_ArrayExpr(out, eu->u.arrayExpr);
     } break;
     case A_exprUnitType::A_memberExprKind: {
       /* write your code here */
+      return check_MemberExpr(out, eu->u.memberExpr);
     } break;
     case A_exprUnitType::A_arithExprKind: {
       /* write your code here */
+      return check_ArithExpr(out, eu->u.arithExpr);
     } break;
     case A_exprUnitType::A_arithUExprKind: {
       /* write your code here */
+      return check_ArithUExpr(out, eu->u.arithUExpr);
     } break;
   }
   return ret;
 }
 
-void check_FuncCall(std::ostream* out, aA_fnCall fc) {
+aA_type check_ArithExpr(std::ostream* out, aA_arithExpr ae) {
+  if (ae->kind == A_arithExprType::A_exprUnitKind) {
+    return check_ExprUnit(out, ae->u.exprUnit);
+  }
+  if (ae->kind == A_arithExprType::A_arithBiOpExprKind) {
+    return check_ArithBiOpExpr(out, ae->u.arithBiOpExpr);
+  }
+  error_print(out, ae->pos, "something wrong.");
+  return nullptr;
+}
+
+aA_type check_ArithUExpr(std::ostream* out, aA_arithUExpr aue) {
+  aA_type ret = check_ExprUnit(out, aue->expr);
+  if (!Equal(ret, Int_aAType)) {
+    error_print(
+        out, aue->pos,
+        string("can't use '-' before ") + get_TypeName(ret) + string(" type."));
+  }
+  return ret;
+}
+
+aA_type check_ArithBiOpExpr(std::ostream* out, aA_arithBiOpExpr aboe) {
+  aA_type left_type = check_ArithExpr(out, aboe->left);
+  if (!Equal(left_type, Int_aAType)) {
+    error_print(out, aboe->pos,
+                string("can't use '+-*/' after ") + get_TypeName(left_type) +
+                    string(" type."));
+  }
+  aA_type right_type = check_ArithExpr(out, aboe->right);
+  if (!Equal(right_type, Int_aAType)) {
+    error_print(out, aboe->pos,
+                string("can't use '-' before ") + get_TypeName(right_type) +
+                    string(" type."));
+  }
+  return left_type;
+}
+
+aA_type check_FuncCall(std::ostream* out, aA_fnCall fc) {
   if (!fc) return;
   // Example:
   //      foo(1, 2);
@@ -457,16 +529,17 @@ void check_FuncCall(std::ostream* out, aA_fnCall fc) {
     error_print(
         out, fc->pos,
         string("Function \"") + *(fc->fn) + string("\" is not defined"));
+    return nullptr;
   }
   it->second->CheckCall(out, fc);
-  return;
+  return it->second->getRetType();
 }
 
-void check_WhileStmt(std::ostream* out, aA_whileStmt ws) {
+void check_WhileStmt(std::ostream* out, aA_whileStmt ws, my_Func func) {
   if (!ws) return;
   check_BoolExpr(out, ws->boolExpr);
   for (aA_codeBlockStmt s : ws->whileStmts) {
-    check_CodeblockStmt(out, s);
+    check_CodeblockStmt(out, s, func);
   }
   return;
 }
@@ -477,8 +550,16 @@ void check_CallStmt(std::ostream* out, aA_callStmt cs) {
   return;
 }
 
-void check_ReturnStmt(std::ostream* out, aA_returnStmt rs) {
+void check_ReturnStmt(std::ostream* out, aA_returnStmt rs, aA_type expected) {
   if (!rs) return;
+
+  aA_type retType = get_RightValType(out, rs->retVal);
+  if (!Equal(retType, expected)) {
+    error_print(out, retType->pos,
+                string("return type ") + get_TypeName(retType) +
+                    string(" not match function return type: ") +
+                    get_TypeName(expected) + string(" ."));
+  }
   return;
 }
 
@@ -501,16 +582,13 @@ void check_l_varName(std::ostream* out, A_pos pos, string name) {
   }
 }
 
-void check_fnDecled() {}
-
-void check_fnDefed() {}
-
 aA_type get_RightValType(std::ostream* out, aA_rightVal rl) {
   if (rl->kind == A_rightValType::A_arithExprValKind) {
+    return check_ArithExpr(out, rl->u.arithExpr);
   }
   if (rl->kind == A_rightValType::A_boolExprValKind) {
+    return Bool_aAType;
   }
-  error_print(out, rl->pos, "some thing wrong.");
   return nullptr;
 }
 
@@ -693,4 +771,287 @@ int get_arraySize(string name) {
   }
 
   return -1;
+}
+
+my_Var VarDeclCheckProxyFactory::CreateVarDeclProxy(std::ostream* out,
+                                                    aA_varDeclStmt vd,
+                                                    bool isGlobal = true,
+                                                    bool isParam = false) {
+  if (vd->kind == A_varDeclStmtType::A_varDeclKind) {
+    if (vd->u.varDecl->kind == A_varDeclType::A_varDeclScalarKind) {
+      return std::make_shared<ScalarDeclProxy>(out, vd, isGlobal, isParam);
+    } else {
+      return std::make_shared<ArrayDeclProxy>(out, vd, isGlobal, isParam);
+    }
+  } else if (vd->kind == A_varDeclStmtType::A_varDefKind) {
+    if (vd->u.varDef->kind == A_varDefType::A_varDefScalarKind) {
+      return std::make_shared<ScalarDefProxy>(out, vd, isGlobal, isParam);
+    } else {
+      return std::make_shared<ArrayDefProxy>(out, vd, isGlobal, isParam);
+    }
+  }
+  return nullptr;
+}
+
+VarDeclCheckProxy::VarDeclCheckProxy(std::ostream* out, aA_varDeclStmt vd,
+                                     bool isGlobal, bool isParam) {
+  name_ = *vd->u.varDecl->u.declScalar->id;
+  pos_ = vd->u.varDecl->u.declScalar->pos;
+  type_ = vd->u.varDecl->u.declScalar->type;
+  global_ = isGlobal;
+  param_ = isParam;
+  out_ = out;
+  // if (global_) {
+  //   token2type_ = &g_token2Type;
+  //   token2pos_ = &g_token2Pos;
+  // } else {
+  //   token2type_ = &l_token2Type;
+  //   token2pos_ = &l_token2Pos;
+  // }
+}
+void VarDeclCheckProxy::CheckStmt() {
+  CheckLegality();
+  ConfigTable();
+}
+
+void VarDeclCheckProxy::Unregister() {
+  if (global_) {
+    return;
+  }
+  EraseTable();
+}
+
+string VarDeclCheckProxy::getName() { return name_; }
+aA_type VarDeclCheckProxy::getType() { return type_; }
+
+bool VarDeclCheckProxy::isScalar() { return true; }
+
+void VarDeclCheckProxy::CheckLegality() {
+  if (global_) {
+    check_g_varName(out_, pos_, name_);
+  } else if (!param_) {
+    check_l_varName(out_, pos_, name_);
+  }
+}
+void VarDeclCheckProxy::ConfigTable() {
+  // token2type_->emplace(name_, type_);
+  // token2pos_->emplace(name_, pos_);
+}
+void VarDeclCheckProxy::EraseTable() {
+  // token2type_->erase(name_);
+  // token2pos_->erase(name_);
+}
+
+ScalarDeclProxy::ScalarDeclProxy(std::ostream* out, aA_varDeclStmt vd,
+                                 bool isGlobal, bool isParam)
+    : VarDeclCheckProxy(out, vd, isGlobal, isParam) {}
+
+ScalarDefProxy::ScalarDefProxy(std::ostream* out, aA_varDeclStmt vd,
+                               bool isGlobal, bool isParam)
+    : ScalarDeclProxy(out, vd, isGlobal, isParam) {
+  val_ = vd->u.varDef->u.defScalar->val;
+}
+void ScalarDefProxy::CheckLegality() {
+  VarDeclCheckProxy::CheckLegality();
+  aA_type assign_type = get_RightValType(out_, val_);
+  check_Convert(out_, pos_, type_, assign_type);
+}
+
+ArrayDeclProxy::ArrayDeclProxy(std::ostream* out, aA_varDeclStmt vd,
+                               bool isGlobal, bool isParam)
+    : VarDeclCheckProxy(out, vd, isGlobal, isParam) {
+  // if (global_) {
+  //   token2Szie_ = &g_token2Size;
+  // } else {
+  //   token2Szie_ = &l_token2Size;
+  // }
+  size_ = vd->u.varDef->u.defArray->len;
+}
+int ArrayDeclProxy::getSize() { return size_; }
+
+bool ArrayDeclProxy::isScalar() { return false; }
+
+void ArrayDeclProxy::ConfigTable() {
+  VarDeclCheckProxy::ConfigTable();
+  // token2Szie_->emplace(name_, size_);
+}
+
+void ArrayDeclProxy::EraseTable() {
+  VarDeclCheckProxy::EraseTable();
+  // token2Szie_->erase(name_);
+}
+
+ArrayDefProxy::ArrayDefProxy(std::ostream* out, aA_varDeclStmt vd,
+                             bool isGlobal, bool isParam)
+    : ArrayDeclProxy(out, vd, isGlobal, isParam) {
+  vals_ = &vd->u.varDef->u.defArray->vals;
+}
+
+void ArrayDefProxy::CheckLegality() {
+  VarDeclCheckProxy::CheckLegality();
+  if (vals_->size() != 1 && vals_->size() != size_) {
+    error_print(out_, pos_,
+                string("num of list is not match with array's size"));
+  }
+  for (auto val : *vals_) {
+    aA_type assign_type = get_RightValType(out_, val);
+    check_Convert(out_, pos_, type_, assign_type);
+  }
+}
+
+FnProxy::FnProxy(std::ostream* out, aA_fnDecl fd) {
+  defined_ = false;
+  check_g_varName(out, fd->pos, *fd->id);
+  // vector<aA_varDecl>* params =
+  //     new vector<aA_varDecl>(fd->paramDecl->varDecls);
+  // funcDelcs.emplace(*(fd->id));
+  // func2Param.emplace(*(fd->id), params);
+  // func2Pos.emplace(*(fd->id), fd->pos);
+  // funcparam_token2Type.emplace(*(fd->id), fd->type);
+  Init(fd);
+}
+
+FnProxy::FnProxy(std::ostream* out, aA_fnDef fd) {
+  check_g_varName(out, fd->pos, *fd->fnDecl->id);
+  Init(fd->fnDecl);
+}
+
+string FnProxy::getName() { return name_; }
+
+bool FnProxy::isDefined() { return defined_; }
+
+void FnProxy::CheckDecl(std::ostream* out, aA_fnDecl fd) {
+  check_g_varName(out, fd->pos, *fd->id);
+  CheckParams(out, fd);
+  if (!Equal(fd->type, ret_type_)) {
+    error_print(out, fd->pos, "return type conflicts.");
+  }
+}
+
+void FnProxy::CheckDefine(std::ostream* out, aA_fnDef fd) {
+  vector<string> params;
+  for (aA_varDecl vd : fd->fnDecl->paramDecl->varDecls) {
+    aA_varDeclStmt vdStmt = new aA_varDeclStmt_;
+    vdStmt->pos = vd->pos;
+    vdStmt->kind = A_varDeclStmtType::A_varDeclKind;
+    vdStmt->u.varDecl = vd;
+    my_Var decl =
+        VarDeclCheckProxyFactory::CreateVarDeclProxy(out, vdStmt, false, true);
+
+    decl->CheckStmt();
+    params.push_back(decl->getName());
+    l_token2Var.emplace(decl->getName(), decl);
+  }
+
+  for (auto cs : fd->stmts) {
+    check_CodeblockStmt(out, cs, token2Func[name_]);
+  }
+
+  for (auto codeBlockStmt : fd->stmts) {
+    switch (codeBlockStmt->kind) {
+      case A_varDeclStmtKind:
+        erase_localVar(codeBlockStmt->u.varDeclStmt);
+        break;
+      default:
+        break;
+    }
+  }
+  for (auto param : params) {
+    // l_token2Var[param]->Unregister();
+    l_token2Var.erase(param);
+  }
+}
+
+void FnProxy::CheckCall(std::ostream* out, aA_fnCall fc) {
+  if (fc->vals.size() != params_.size()) {
+    goto error;
+  }
+  for (int i = 0; i < fc->vals.size(); i++) {
+    aA_rightVal val = fc->vals[i];
+    aA_varDecl param = params_[i];
+    if (param->kind == A_varDeclType::A_varDeclScalarKind) {
+      aA_varDeclScalar scalar = param->u.declScalar;
+      if (!Equal(get_RightValType(out, val), scalar->type)) {
+        goto error;
+      }
+    } else if (param->kind == A_varDeclType::A_varDeclArrayKind) {
+      if (val->kind == A_rightValType::A_arithExprValKind &&
+          val->u.arithExpr->kind == A_arithExprType::A_exprUnitKind &&
+          val->u.arithExpr->u.exprUnit->kind == A_exprUnitType::A_idExprKind) {
+        string name = *val->u.arithExpr->u.exprUnit->u.id;
+        aA_varDeclArray array = param->u.declArray;
+        int len = get_arraySize(name);
+        if (len != array->len) {
+          goto error;
+        }
+        if (!Equal(get_arrayType(name), array->type)) {
+          goto error;
+        }
+      } else {
+        goto error;
+      }
+    }
+  }
+error:
+  error_print(out, fc->pos,
+              string("Function parameter \"") + *(fc->fn) +
+                  string("\" does not match."));
+}
+
+aA_type FnProxy::getRetType() { return ret_type_; }
+
+void FnProxy::Init(aA_fnDecl fd) {
+  name_ = *(fd->id);
+  ret_type_ = fd->type;
+  params_ = fd->paramDecl->varDecls;
+}
+
+void FnProxy::CheckParams(std::ostream* out, aA_fnDecl fd) {
+  auto& target = fd->paramDecl->varDecls;
+
+  if (target.size() != params_.size()) goto error;
+  for (int i = 0; i < params_.size(); i++) {
+    aA_varDecl a = params_[i];
+    aA_varDecl b = target[i];
+    if (a->kind == A_varDeclScalarKind && b->kind == A_varDeclScalarKind) {
+      if (!Equal(a->u.declScalar->type, b->u.declScalar->type)) {
+        goto error;
+      }
+    } else if (a->kind == A_varDeclArrayKind && b->kind == A_varDeclArrayKind) {
+      aA_varDeclArray aArray = a->u.declArray;
+      aA_varDeclArray bArray = b->u.declArray;
+      if (aArray->len != bArray->len) goto error;
+      if (!Equal(aArray->type, bArray->type)) goto error;
+    } else {
+      goto error;
+    }
+  }
+error:
+  error_print(out, fd->pos, "Function overloading is not currently supported.");
+}
+
+StructProxy::StructProxy(std::ostream* out, aA_structDef sd) {
+  // if (token2Struct.find(*(sd->id)) != token2Struct.end()) {
+  //   error_print(out, sd->pos, " struct redefine: " + *sd->id);
+  //   return;
+  // }
+  members_ = sd->varDecls;
+  defPos_ = sd->pos;
+  name_ = *sd->id;
+}
+
+aA_type StructProxy::CheckMember(std::ostream* out, A_pos pos, string member) {
+  for (auto memDecl : members_) {
+    if (memDecl->kind == A_varDeclType::A_varDeclScalarKind) {
+      if (memDecl->u.declScalar->id->compare(member) == 0)
+        return memDecl->u.declScalar->type;
+    } else {
+      if (memDecl->u.declArray->id->compare(member) == 0)
+        return memDecl->u.declScalar->type;
+    }
+  }
+  error_print(out, pos,
+              string("' struct '") + name_ + string("' doesn't have member '") +
+                  member + string("'."));
+  return nullptr;
 }
