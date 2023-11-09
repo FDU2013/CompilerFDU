@@ -347,12 +347,6 @@ aA_type check_ArrayExpr(std::ostream* out, aA_arrayExpr ae) {
                       string(" is out of range. "));
   }
   return array->getType();
-  // if (ae->idx->kind == A_indexExprKind::A_numIndexKind) {
-  //   if (size <= ae->idx->u.num)
-  //     error_print(out, ae->idx->pos,
-  //                 string("array index ") + std::to_string(ae->idx->u.num) +
-  //                     string(" is out of range. "));
-  // }
 }
 
 aA_type check_MemberExpr(std::ostream* out, aA_memberExpr me) {
