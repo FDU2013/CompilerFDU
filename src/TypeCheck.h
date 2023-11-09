@@ -45,7 +45,6 @@ using varMap = std::unordered_map<string, my_Var>;
 using funcMap = std::unordered_map<string, my_Func>;
 using structMap = std::unordered_map<string, my_Struct>;
 
-
 void check_Prog(std::ostream* out, aA_program p);
 void check_VarDecl(std::ostream* out, aA_varDeclStmt vd);
 void check_StructDef(std::ostream* out, aA_structDef sd);
@@ -72,17 +71,16 @@ void check_ReturnStmt(std::ostream* out, aA_returnStmt rs, aA_type expected);
 
 void check_Convert(std::ostream* out, A_pos pos, aA_type left, aA_type right);
 void check_Compare(std::ostream* out, A_pos pos, aA_type left, aA_type right);
-void check_scalarExists(std::ostream* out, A_pos pos,
-                        string name);  
+void check_scalarExists(std::ostream* out, A_pos pos, string name);
 my_Var check_arrayExists(std::ostream* out, A_pos pos, string name);
 void cancelStmtRegis(std::ostream* out, aA_varDeclStmt vd);
 
 void check_g_varName(std::ostream* out, A_pos pos, string name);
 void check_l_varName(std::ostream* out, A_pos pos, string name);
 
-void check_FnPreDef(std::ostream* out, aA_fnDef fd) ;
+void check_FnPreDef(std::ostream* out, aA_fnDef fd);
 aA_type check_ArithBiOpExpr(std::ostream* out, aA_arithBiOpExpr aboe);
-aA_type check_ArithUExpr(std::ostream* out, aA_arithUExpr aue) ;
+aA_type check_ArithUExpr(std::ostream* out, aA_arithUExpr aue);
 aA_type check_ArithExpr(std::ostream* out, aA_arithExpr ae);
 
 bool Equal(aA_type type1, aA_type type2);
@@ -136,8 +134,6 @@ class VarDeclCheckProxy {
   std::ostream* out_;
 
   virtual void CheckLegality();
-  virtual void ConfigTable();
-  virtual void EraseTable();
 };
 
 class ScalarDeclProxy : public VarDeclCheckProxy {
@@ -167,11 +163,6 @@ class ArrayDeclProxy : public VarDeclCheckProxy {
  protected:
   int size_;
   // arraySizeMap* token2Szie_;
-
-  virtual void ConfigTable() override;
-
-  virtual void EraseTable() override;
-
 };
 
 class ArrayDefProxy : public ArrayDeclProxy {
@@ -193,6 +184,8 @@ class FnProxy {
 
   string getName();
 
+  A_pos getDefPos();
+
   bool isDefined();
 
   void CheckDecl(std::ostream* out, aA_fnDecl fd);
@@ -204,7 +197,7 @@ class FnProxy {
   aA_type getRetType();
 
  protected:
-  // bool decleared_; 
+  // bool decleared_;
   bool defined_;
   string name_;
   A_pos defPos_;

@@ -1,8 +1,8 @@
 #include "TypeCheck.h"
 
+#include <iostream>
 #include <memory>
 #include <string>
-#include <iostream>
 
 #include "TeaplAst.h"
 #include "TeaplaAst.h"
@@ -26,7 +26,6 @@ varMap l_token2Var;
 structMap token2Struct;
 
 funcMap token2Func;
-
 
 static auto boolup = std::make_unique<aA_type_>();
 static auto intup = std::make_unique<aA_type_>();
@@ -117,18 +116,18 @@ void check_Prog(std::ostream* out, aA_program p) {
 
   for (auto ele : p->programElements) {
     if (ele->kind == A_programFnDeclStmtKind) {
-      //cout << "func decl" << endl;
+      // cout << "func decl" << endl;
       check_FnDeclStmt(out, ele->u.fnDeclStmt);
     }
     if (ele->kind == A_programFnDefKind) {
-      //cout << "func def" << endl;
+      // cout << "func def" << endl;
       check_FnPreDef(out, ele->u.fnDef);
     }
   }
 
   for (auto ele : p->programElements) {
     if (ele->kind == A_programFnDefKind) {
-      //cout << "check func def" << endl;
+      // cout << "check func def" << endl;
       check_FnDef(out, ele->u.fnDef);
     }
   }
@@ -237,8 +236,8 @@ void check_FnPreDef(std::ostream* out, aA_fnDef fd) {
   if (it != token2Func.end()) {
     if (it->second->isDefined()) {
       error_print(out, fd->pos,
-                  string("function has defined on position: ") +
-                      std::to_string(fd->pos->line));
+                  string("function has defined on line: ") +
+                      std::to_string(it->second->getDefPos()->line));
       return;
     }
     my_Func func = it->second;
@@ -344,7 +343,7 @@ aA_type check_ArrayExpr(std::ostream* out, aA_arrayExpr ae) {
     int size = array->getSize();
     if (size <= ae->idx->u.num)
       error_print(out, ae->idx->pos,
-                  string("array index ") + std::to_string(ae->idx->u.num) +
+                  string("Array index: ") + std::to_string(ae->idx->u.num) +
                       string(" is out of range. "));
   }
   return array->getType();
@@ -371,7 +370,7 @@ aA_type check_MemberExpr(std::ostream* out, aA_memberExpr me) {
   check_scalarExists(out, pos, name);
   auto type = get_varType(name);
   if (type->type == A_dataType::A_nativeTypeKind) {
-    error_print(out, pos, name + string(" is not struct."));
+    error_print(out, pos, name + string(" is not a struct."));
     return nullptr;
   }
   auto it = token2Struct.find(*type->u.structType);
@@ -506,16 +505,16 @@ aA_type check_ArithExpr(std::ostream* out, aA_arithExpr ae) {
   if (ae->kind == A_arithExprType::A_arithBiOpExprKind) {
     return check_ArithBiOpExpr(out, ae->u.arithBiOpExpr);
   }
-  error_print(out, ae->pos, "something wrong.");
+  cout << "null in check_ArithExpr" << endl;
   return nullptr;
 }
 
 aA_type check_ArithUExpr(std::ostream* out, aA_arithUExpr aue) {
   aA_type ret = check_ExprUnit(out, aue->expr);
   if (!Equal(ret, Int_aAType)) {
-    error_print(
-        out, aue->pos,
-        string("can't use '-' before ") + get_TypeName(ret) + string(" type."));
+    error_print(out, aue->pos,
+                string("Type ") + get_TypeName(ret) +
+                    string(" doesn's support operator: '-'."));
   }
   return ret;
 }
@@ -524,14 +523,14 @@ aA_type check_ArithBiOpExpr(std::ostream* out, aA_arithBiOpExpr aboe) {
   aA_type left_type = check_ArithExpr(out, aboe->left);
   if (!Equal(left_type, Int_aAType)) {
     error_print(out, aboe->pos,
-                string("can't use '+-*/' after ") + get_TypeName(left_type) +
-                    string(" type."));
+                string("Type ") + get_TypeName(left_type) +
+                    string(" doesn's support operators: '+-*/'."));
   }
   aA_type right_type = check_ArithExpr(out, aboe->right);
   if (!Equal(right_type, Int_aAType)) {
     error_print(out, aboe->pos,
-                string("can't use '-' before ") + get_TypeName(right_type) +
-                    string(" type."));
+                string("Type ") + get_TypeName(right_type) +
+                    string(" doesn's support operator: '-'."));
   }
   return left_type;
 }
@@ -559,8 +558,8 @@ void check_WhileStmt(std::ostream* out, aA_whileStmt ws, my_Func func) {
   for (aA_codeBlockStmt s : ws->whileStmts) {
     check_CodeblockStmt(out, s, func);
   }
-  for (auto s : ws->whileStmts){
-    if (s->kind == A_codeBlockStmtType::A_varDeclStmtKind){
+  for (auto s : ws->whileStmts) {
+    if (s->kind == A_codeBlockStmtType::A_varDeclStmtKind) {
       erase_localVar(s);
     }
   }
@@ -579,7 +578,7 @@ void check_ReturnStmt(std::ostream* out, aA_returnStmt rs, aA_type expected) {
   aA_type retType = get_RightValType(out, rs->retVal);
   if (!Equal(retType, expected)) {
     error_print(out, retType->pos,
-                string("return type ") + get_TypeName(retType) +
+                string("Your return type: ") + get_TypeName(retType) +
                     string(" not match function return type: ") +
                     get_TypeName(expected) + string(" ."));
   }
@@ -587,13 +586,16 @@ void check_ReturnStmt(std::ostream* out, aA_returnStmt rs, aA_type expected) {
 }
 
 void check_g_varName(std::ostream* out, A_pos pos, string name) {
+  if (token2Struct.find(name) != token2Struct.end()) {
+    error_print(out, pos, name + string(" has been a struct's name."));
+  }
   if (token2Func.find(name) != token2Func.end()) {
     error_print(out, pos,
-                string("function: ") + (name) + string(" have existed."));
+                string("function: ") + name + string(" have existed."));
   }
   if (g_token2Var.find(name) != g_token2Var.end()) {
     error_print(out, pos,
-                string("global var: ") + (name) + string(" have existed."));
+                string("global var: ") + name + string(" have existed."));
   }
 }
 
@@ -735,15 +737,11 @@ aA_type get_varType(string name) {
 aA_type get_scalarType(string name) {
   auto l_it = l_token2Var.find(name);
   if (l_it != l_token2Var.end()) {
-    return l_it->second->isScalar()
-               ? l_it->second->getType()
-               : nullptr;
+    return l_it->second->isScalar() ? l_it->second->getType() : nullptr;
   }
   auto g_it = g_token2Var.find(name);
   if (g_token2Var.count(name) > 0) {
-    return l_it->second->isScalar()
-               ? g_it->second->getType()
-               : nullptr;
+    return l_it->second->isScalar() ? g_it->second->getType() : nullptr;
   }
 
   cout << "null in get_scalarType" << endl;
@@ -753,15 +751,11 @@ aA_type get_scalarType(string name) {
 aA_type get_arrayType(string name) {
   auto l_it = l_token2Var.find(name);
   if (l_it != l_token2Var.end()) {
-    return l_it->second->isScalar()
-               ? nullptr
-               : l_it->second->getType();
+    return l_it->second->isScalar() ? nullptr : l_it->second->getType();
   }
   auto g_it = g_token2Var.find(name);
   if (g_token2Var.count(name) > 0) {
-    return l_it->second->isScalar()
-               ? nullptr
-               : g_it->second->getType();
+    return l_it->second->isScalar() ? nullptr : g_it->second->getType();
   }
 
   cout << "null in get_arrayType" << endl;
@@ -830,25 +824,8 @@ VarDeclCheckProxy::VarDeclCheckProxy(std::ostream* out, aA_varDeclStmt vd,
   global_ = isGlobal;
   param_ = isParam;
   out_ = out;
-  // if (global_) {
-  //   token2type_ = &g_token2Type;
-  //   token2pos_ = &g_token2Pos;
-  // } else {
-  //   token2type_ = &l_token2Type;
-  //   token2pos_ = &l_token2Pos;
-  // }
 }
-void VarDeclCheckProxy::CheckStmt() {
-  CheckLegality();
-  ConfigTable();
-}
-
-void VarDeclCheckProxy::Unregister() {
-  if (global_) {
-    return;
-  }
-  EraseTable();
-}
+void VarDeclCheckProxy::CheckStmt() { CheckLegality(); }
 
 string VarDeclCheckProxy::getName() { return name_; }
 aA_type VarDeclCheckProxy::getType() { return type_; }
@@ -861,14 +838,6 @@ void VarDeclCheckProxy::CheckLegality() {
   } else if (!param_) {
     check_l_varName(out_, pos_, name_);
   }
-}
-void VarDeclCheckProxy::ConfigTable() {
-  // token2type_->emplace(name_, type_);
-  // token2pos_->emplace(name_, pos_);
-}
-void VarDeclCheckProxy::EraseTable() {
-  // token2type_->erase(name_);
-  // token2pos_->erase(name_);
 }
 
 ScalarDeclProxy::ScalarDeclProxy(std::ostream* out, aA_varDeclStmt vd,
@@ -889,27 +858,11 @@ void ScalarDefProxy::CheckLegality() {
 ArrayDeclProxy::ArrayDeclProxy(std::ostream* out, aA_varDeclStmt vd,
                                bool isGlobal, bool isParam)
     : VarDeclCheckProxy(out, vd, isGlobal, isParam) {
-  // if (global_) {
-  //   token2Szie_ = &g_token2Size;
-  // } else {
-  //   token2Szie_ = &l_token2Size;
-  // }
   size_ = vd->u.varDef->u.defArray->len;
-  
 }
 int ArrayDeclProxy::getSize() { return size_; }
 
 bool ArrayDeclProxy::isScalar() { return false; }
-
-void ArrayDeclProxy::ConfigTable() {
-  VarDeclCheckProxy::ConfigTable();
-  // token2Szie_->emplace(name_, size_);
-}
-
-void ArrayDeclProxy::EraseTable() {
-  VarDeclCheckProxy::EraseTable();
-  // token2Szie_->erase(name_);
-}
 
 ArrayDefProxy::ArrayDefProxy(std::ostream* out, aA_varDeclStmt vd,
                              bool isGlobal, bool isParam)
@@ -921,7 +874,7 @@ void ArrayDefProxy::CheckLegality() {
   VarDeclCheckProxy::CheckLegality();
   if (vals_->size() != 1 && vals_->size() != size_) {
     error_print(out_, pos_,
-                string("num of list is not match with array's size"));
+                string("The list's lenth should be equal to the array's size"));
   }
   for (auto val : *vals_) {
     aA_type assign_type = get_RightValType(out_, val);
@@ -932,30 +885,23 @@ void ArrayDefProxy::CheckLegality() {
 FnProxy::FnProxy(std::ostream* out, aA_fnDecl fd) {
   defined_ = false;
   check_g_varName(out, fd->pos, *fd->id);
-  // vector<aA_varDecl>* params =
-  //     new vector<aA_varDecl>(fd->paramDecl->varDecls);
-  // funcDelcs.emplace(*(fd->id));
-  // func2Param.emplace(*(fd->id), params);
-  // func2Pos.emplace(*(fd->id), fd->pos);
-  // funcparam_token2Type.emplace(*(fd->id), fd->type);
   Init(fd);
 }
 
 FnProxy::FnProxy(std::ostream* out, aA_fnDef fd) {
   check_g_varName(out, fd->pos, *fd->fnDecl->id);
   Init(fd->fnDecl);
+  defined_ = true;
+  defPos_ = fd->pos;
 }
 
 string FnProxy::getName() { return name_; }
 
+A_pos FnProxy::getDefPos() { return defPos_; }
+
 bool FnProxy::isDefined() { return defined_; }
 
 void FnProxy::CheckDecl(std::ostream* out, aA_fnDecl fd) {
-  // if(!decleared_){
-  //   check_g_varName(out, fd->pos, *fd->id);
-  // } else {
-  //   decleared_ = true;
-  // }
   CheckParams(out, fd);
   if (!Equal(fd->type, ret_type_)) {
     error_print(out, fd->pos, "return type conflicts.");
@@ -963,7 +909,6 @@ void FnProxy::CheckDecl(std::ostream* out, aA_fnDecl fd) {
 }
 
 void FnProxy::CheckDefine(std::ostream* out, aA_fnDef fd) {
-  defined_ = true;
   vector<string> params;
   for (aA_varDecl vd : fd->fnDecl->paramDecl->varDecls) {
     aA_varDeclStmt vdStmt = new aA_varDeclStmt_;
@@ -978,7 +923,7 @@ void FnProxy::CheckDefine(std::ostream* out, aA_fnDef fd) {
     l_token2Var.emplace(decl->getName(), decl);
   }
 
-  for (auto cs: fd->stmts) {
+  for (auto cs : fd->stmts) {
     check_CodeblockStmt(out, cs, token2Func[name_]);
   }
 
@@ -1031,8 +976,8 @@ void FnProxy::CheckCall(std::ostream* out, aA_fnCall fc) {
   return;
 error:
   error_print(out, fc->pos,
-              string("Function parameter \"") + *(fc->fn) +
-                  string("\" does not match."));
+              string("The parameters passed in do not match the function \"") +
+                  *(fc->fn) + string("\"'s definition ."));
 }
 
 aA_type FnProxy::getRetType() { return ret_type_; }
@@ -1047,7 +992,7 @@ void FnProxy::CheckParams(std::ostream* out, aA_fnDecl fd) {
   auto& target = fd->paramDecl->varDecls;
 
   if (target.size() != params_.size()) goto error;
-  
+
   for (int i = 0; i < params_.size(); i++) {
     aA_varDecl a = params_[i];
     aA_varDecl b = target[i];
@@ -1090,7 +1035,7 @@ aA_type StructProxy::CheckMember(std::ostream* out, A_pos pos, string member) {
     }
   }
   error_print(out, pos,
-              string("' struct '") + name_ + string("' doesn't have member '") +
-                  member + string("'."));
+              string("' struct '") + name_ +
+                  string("' doesn't have member: '") + member + string("'."));
   return nullptr;
 }
