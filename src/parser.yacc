@@ -338,11 +338,11 @@ BoolUOpExpr{
 //16
 //A_boolBiOpExpr A_BoolBiOpExpr(A_pos pos, A_boolBiOp op, A_boolExpr left, A_boolUnit right);
 BoolBiOpExpr:
-BoolExpr OR BoolUnit{
+BoolExpr OR BoolExpr{
   $$ = A_BoolBiOpExpr($1->pos,A_or,$1,$3);
 }
 |
-BoolExpr AND BoolUnit{
+BoolExpr AND BoolExpr{
   $$ = A_BoolBiOpExpr($1->pos,A_and,$1,$3);
 };
 
