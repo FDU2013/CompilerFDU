@@ -84,7 +84,7 @@ extern int  yywrap();
 %token <pos> COLON //冒号
 %token <pos> LET //let
 %token <pos> POINT //点，比如用在struct上
-%token <pos> RET //ret
+%token <pos> RETURN //ret
 %token <pos> AND //与
 %token <pos> OR //或
 %token <pos> NOT //非
@@ -306,15 +306,15 @@ Id{
 //13 数组
 //A_arrayExpr A_ArrayExpr(A_pos pos, char* arr, A_indexExpr idx);
 ArrayExpr:
-Id LEFT_SQUARE_BRACKET IndexExpr RIGHT_SQUARE_BRACKET{
-  $$ = A_ArrayExpr($1->pos,$1->id,$3);
+LeftVal LEFT_SQUARE_BRACKET IndexExpr RIGHT_SQUARE_BRACKET{
+  $$ = A_ArrayExpr($1->pos,$1,$3);
 };
 
 //14 member是？
 //A_memberExpr A_MemberExpr(A_pos pos, char* structId, char* memberId);
 MemberExpr:
-Id POINT Id{
-  $$ = A_MemberExpr($1->pos,$1->id,$3->id);
+LeftVal POINT Id{
+  $$ = A_MemberExpr($1->pos,$1,$3->id);
 };
 
 
@@ -595,9 +595,14 @@ FnCall SEMICOLON{
 //37
 //A_returnStmt A_ReturnStmt(A_pos pos, A_rightVal retVal);
 ReturnStmt:
-RET RightVal SEMICOLON{
+RETURN RightVal SEMICOLON{
   $$ = A_ReturnStmt($1,$2);
-};
+}
+| RETURN SEMICOLON
+{
+  $$ = A_ReturnStmt($1, NULL);
+}
+;
 
 //38
 //A_programElement A_ProgramNullStmt(A_pos pos);

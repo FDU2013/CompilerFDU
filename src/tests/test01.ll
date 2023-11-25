@@ -10,7 +10,7 @@ declare void @_sysy_stoptime( i32 )
 @c = global i32 1
 define i32 @main( ) {
 bb1:
-  call void @_sysy_starttime(i32 4)
+  call void @_sysy_starttime(i32 6)
   %r100 = alloca i32
   store i32 0, i32* %r100
   %r101 = alloca i32
@@ -60,7 +60,7 @@ bb7:
   call void @putint(i32 %r119)
   %r120 = load i32, i32* %r101
   call void @putint(i32 %r120)
-  call void @_sysy_stoptime(i32 19)
+  call void @_sysy_stoptime(i32 23)
   ret i32 0
 }
 

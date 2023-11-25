@@ -7,12 +7,9 @@ declare void @_sysy_starttime( i32 )
 declare void @_sysy_stoptime( i32 )
 @a = global i32 1
 define i32 @foo( i32 %r100 ) {
-bb7:
+bb1:
   %r101 = alloca i32
   store i32 %r100, i32* %r101
-  br label %bb1
-
-bb1:
   %r102 = load i32, i32* %r101
   store i32 %r102, i32* @a
   ret i32 1

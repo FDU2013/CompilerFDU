@@ -38,7 +38,7 @@ extern int line, col;
 ":" {yylval.pos=A_Pos(line,col);col+=strlen(yytext);return COLON;}
 "let" {yylval.pos=A_Pos(line,col);col+=strlen(yytext);return LET;}
 "." {yylval.pos=A_Pos(line,col);col+=strlen(yytext);return POINT;}
-"ret" {yylval.pos=A_Pos(line,col);col+=strlen(yytext);return RET;}
+"ret" {yylval.pos=A_Pos(line,col);col+=strlen(yytext);return RETURN;}
 "&&" {yylval.pos=A_Pos(line,col);col+=strlen(yytext);return AND;}
 "||" {yylval.pos=A_Pos(line,col);col+=strlen(yytext);return OR;}
 "!" {yylval.pos=A_Pos(line,col);col+=strlen(yytext);return NOT;}
@@ -53,7 +53,7 @@ extern int line, col;
 "struct" {yylval.pos=A_Pos(line,col);col+=strlen(yytext);return STRUCT;}
 " " {col+=1;}
 "\t" {col+=4;}
-[a-zA-Z]+([a-zA-Z0-9]*) 	{ 
+[a-zA-Z_]+([a-zA-Z0-9_]*) 	{ 
     int len = strlen(yytext);
     char* new_text = (char*)malloc((len+1)*sizeof(char));
     strcpy(new_text, yytext);

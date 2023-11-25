@@ -8,14 +8,11 @@ declare void @_sysy_stoptime( i32 )
 @N = global i32 0
 @newline = global i32 0
 define i32 @factor( i32 %r100 ) {
-bb9:
-  %r103 = alloca i32
-  %r102 = alloca i32
+bb1:
   %r101 = alloca i32
   store i32 %r100, i32* %r101
-  br label %bb1
-
-bb1:
+  %r102 = alloca i32
+  %r103 = alloca i32
   store i32 0, i32* %r103
   store i32 1, i32* %r102
   br label %bb2

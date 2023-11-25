@@ -34,7 +34,7 @@ bb2:
 
 define i32 @main( ) {
 bb3:
-  call void @_sysy_starttime(i32 13)
+  call void @_sysy_starttime(i32 22)
   %r112 = alloca %Node
   %r113 = getelementptr %Node, %Node* %r112, i32 0, i32 0
   store i32 1, i32* %r113
@@ -63,7 +63,7 @@ bb3:
   %r130 = load i32, i32* %r129
   %r131 = add i32 %r127, %r130
   call void @putint(i32 %r131)
-  call void @_sysy_stoptime(i32 19)
+  call void @_sysy_stoptime(i32 32)
   ret i32 0
 }
 
