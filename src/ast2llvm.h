@@ -39,23 +39,34 @@ void ast2llvmIfStmt(aA_ifStmt s, Temp_label *con_label = nullptr,
 Func_local *ast2llvmFunc(aA_fnDef f);
 void ast2llvmBlock(aA_codeBlockStmt b, Temp_label *con_label = nullptr,
                    Temp_label *bre_label = nullptr);
+void unRegisLocalVar(vector<aA_codeBlockStmt> &stmts);
 void ast2llvmReturnStmt(aA_returnStmt s);
 void ast2llvmAssignStmt(aA_assignStmt s);
 Temp_temp *ast2llvmLoadGlobalVar(Name_name *name);
 void ast2llvmVarDeclStmt(aA_varDeclStmt s);
 void ast2llvmCallStmt(aA_callStmt s);
-AS_operand *ast2llvmArithBiOpExpr(aA_arithBiOpExpr a);
-AS_operand *ast2llvmArithExpr(aA_arithExpr a);
-AS_operand *ast2llvmExprUnit(aA_exprUnit e);
-AS_operand *ast2llvmIndexExpr(aA_indexExpr index);
-AS_operand *ast2llvmArrayExpr(aA_arrayExpr e);
-AS_operand *ast2llvmMemberExpr(aA_memberExpr e);
-AS_operand *searchMemberInStruct(string structname, string membername);
+
 AS_operand *ast2llvmRightVal(aA_rightVal r);
+
 AS_operand *ast2llvmLeftVal(aA_leftVal l);
+
 AS_operand *ast2llvmIdExpr(string id);
 void ast2llvmComOpExpr(aA_comExpr c, Temp_label *true_label,
                        Temp_label *false_label);
+
+AS_operand *ast2llvmArithBiOpExpr(aA_arithBiOpExpr a);
+
+AS_operand *ast2llvmArithExpr(aA_arithExpr a);
+
+AS_operand *ast2llvmExprUnit(aA_exprUnit e);
+
+AS_operand *ast2llvmIndexExpr(aA_indexExpr index);
+
+AS_operand *ast2llvmArrayExpr(aA_arrayExpr e);
+
+AS_operand *ast2llvmMemberExpr(aA_memberExpr e);
+AS_operand *searchMemberInStruct(string structname, string membername);
+
 void ast2llvmBoolExpr(aA_boolExpr b, Temp_label *true_label = nullptr,
                       Temp_label *false_label = nullptr);
 void ast2llvmBoolBiOpExpr(aA_boolBiOpExpr b, Temp_label *true_label,
@@ -64,9 +75,12 @@ void ast2llvmBoolUOpExpr(aA_boolUOpExpr b, Temp_label *true_label,
                          Temp_label *false_label);
 void ast2llvmBoolUnit(aA_boolUnit b, Temp_label *true_label,
                       Temp_label *false_label);
+
 AS_operand *ast2llvmArithUExpr(aA_arithUExpr a);
+
 LLVMIR::L_func *ast2llvmFuncBlock(Func_local *f);
 void ast2llvm_moveAlloca(LLVMIR::L_func *f);
+
 LLVMIR::L_prog *ast2llvm(aA_program p);
 
 int ast2llvmRightVal_first(aA_rightVal r);

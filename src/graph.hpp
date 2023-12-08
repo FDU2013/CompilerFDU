@@ -48,22 +48,22 @@ class Graph {
         nodecount = 0;
         mynodes = std::map<int, Node<T>*>();
     }
-    /* Make a new node in graph "g", with associated "info" */
+    
     Node<T>* addNode(T info);
 
     void rmNode(Node<T>*);
 
-    /* Get the list of nodes belonging to "g" */
+    
     std::map<int, Node<T>*>* nodes();
 
     /* Make a new edge joining nodes "from" and "to", which must belong
         to the same graph */
     void addEdge(Node<T>* from, Node<T>* to);
 
-    /* Delete the edge joining "from" and "to" */
+    
     void rmEdge(Node<T>* from, Node<T>* to);
 
-    /* Tell if there is an edge from "from" to "to" */
+    
     bool goesTo(Node<T>* from, Node<T>* n);
 };
 
@@ -93,7 +93,7 @@ int Node<T>::inDegree() {
     return this->preds.size();
 }
 
-/* return length of successor list for node n */
+
 template <typename T>
 int Node<T>::outDegree() {
     int deg = 0;
@@ -142,4 +142,4 @@ template <typename T>
 bool Graph<T>::goesTo(Node<T>* from, Node<T>* n) {
     return from->succs.count(n->mykey);
 }
-}  // namespace GRAPH
+}  

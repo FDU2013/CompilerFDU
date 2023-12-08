@@ -143,6 +143,9 @@ extern int  yywrap();
 %type <programElementList> ProgramElementList //40
 %type <program> Program //41
 
+%left ADD SUB
+%left MUL DIV
+
 %start Program
 
 %%                   /* beginning of rules section */
